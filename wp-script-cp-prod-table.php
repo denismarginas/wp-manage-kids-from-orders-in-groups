@@ -181,7 +181,11 @@ function all_orders_with_products_shortcode()
                                     </p>
                                 </div>
                             </td>
-                            <td><?php echo esc_html($product_name); ?></td>
+                            <td>
+                                <a href="<?php echo esc_url(get_permalink($product_id)); ?>" class="link-dm">
+                                    <?php echo esc_html($product_name); ?>
+                                </a>
+                            </td>
                             <td><?php echo $child_name ? showChildUrl(cleanMetaValue($child_name), cleanMetaValue($child_id)) : 'N/A'; ?></td>
                             <td><?php echo $child_id ? cleanMetaValue($child_id) : 'N/A'; ?></td>
                         </tr>
