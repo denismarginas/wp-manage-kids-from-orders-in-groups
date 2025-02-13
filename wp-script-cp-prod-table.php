@@ -1,4 +1,4 @@
-<?php
+
 
 // -------------------------
 // Define Functions - Start
@@ -157,19 +157,190 @@ function customFieldsOfPost($postId) {
     }
 }
 
-function updatePostGroups() {
-    // Get all checked checkboxes
-    //const checkedBoxes = document.querySelectorAll('#group-checkboxes input[type="checkbox"]:checked');
-    
-    // Prepare an array of the values of checked checkboxes
-    //const selectedGroups = Array.from(checkedBoxes).map(box => box.value);
+function getCustomFieldsFromProductOrder($order_item) {
+    // Get all meta data for the product in the order item
+    $meta_data = $order_item->get_meta_data(); 
 
-    // Example of what to do with the selected values
-    //console.log('Selected Groups:', selectedGroups);
+    // Check if there are meta fields and loop through them
+    if (!empty($meta_data)) {
+        foreach ($meta_data as $meta) {
+            $key = esc_html($meta->key);   // Meta field key (e.g., custom field name)
+            $value = $meta->value;  // Meta field value
+            if( ($key != 'product_extras')) {
+                // Check if the value is an array
+                if (is_array($value)) {
+                    // If it's an array, loop through and display the items
+                    echo '<p><span class="field-label">' . $key . ':</span> <span class="field-value">';
+                    echo implode(', ', $value);  // Join array values with commas
+                    echo '</span></p>';
+                } else {
+                    // If it's not an array, just display the value
+                    echo '<p><span class="field-label">' . $key . ':</span> <span class="field-value">' . cleanMetaValue($value) . '</span></p>';
+                }
+            }
 
-    // Perform necessary actions (e.g., send an AJAX request or update the post)
-    // For now, this can just log the selected groups to the console
+        }
+    } else {
+        echo '<p>No custom fields found for this product.</p>';
+    }
 }
+
+function enqueue_my_custom_script() {
+    wp_enqueue_script('my-custom-script', get_template_directory_uri() . '/js/my-custom-script.js', array('jquery'), null, true);
+
+    // Pass the AJAX URL to the JavaScript file
+    wp_localize_script('my-custom-script', 'ajaxurl', admin_url('admin-ajax.php'));
+}
+add_action('wp_enqueue_scripts', 'enqueue_my_custom_script');
+
+
+add_action('wp_ajax_update_groups_for_kid', 'update_groups_for_kid_callback');
+
+function update_groups_for_kid_callback() {
+    // Make sure the required data is sent and sanitize it
+    if (isset($_POST['groups']) && isset($_POST['kid_id'])) {
+        // Sanitize incoming data
+        $kid_id = $_POST['kid_id'];
+        $kid_name = $_POST['kid_name'];
+        $kid_details = $_POST['kid_details'];
+        $order_id = $_POST['order_id'];
+        $order_date = $_POST['order_date'];
+        $order_details = $_POST['order_details'];
+        $product_details = $_POST['product_details'];
+
+        
+        // Get selected groups
+        $groups = is_array($_POST['groups']) ? $_POST['groups'] : [];
+
+        // If "No group" is selected, remove kid from all groups
+        if (in_array('no-group', $groups)) {
+            $groups = []; // Force an empty group list (removing kid from all groups)
+        }
+
+        // Loop through each selected group to add the kid if not already present
+        foreach ($groups as $group_id) {
+            $group_post = get_post($group_id);
+            if ($group_post && $group_post->post_type === 'camp-group') {
+                $kids_list = (array) get_field('kids_list', $group_post->ID);
+
+                // Check if the kid is already in the list
+                $kid_exists = false;
+                foreach ($kids_list as $kid) {
+                    if ($kid['kid_id'] == $kid_id) {
+                        $kid_exists = true;
+                        break;
+                    }
+                }
+
+                // Add the kid if not present
+                if (!$kid_exists) {
+                    $kids_list[] = [
+                        'kid_name'    => $kid_name,
+                        'kid_id'      => $kid_id,
+                        'kid_details' => $kid_details,
+                        'order_id'    => $order_id,
+                        'order_date'  => $order_date,
+                        'order_details' => $order_details,
+                        'product_details' => $product_details,
+                    ];
+                    update_field('kids_list', $kids_list, $group_post->ID);
+                }
+            }
+        }
+
+        // Remove the kid from any groups not in the selected list
+        $all_groups = get_posts([
+            'post_type'      => 'camp-group',
+            'posts_per_page' => -1
+        ]);
+
+        foreach ($all_groups as $group_post) {
+            $kids_list = (array) get_field('kids_list', $group_post->ID);
+
+            // If the group is not selected, remove the kid from it
+            if (!in_array($group_post->ID, $groups)) {
+                $updated_list = [];
+                $kid_removed = false;
+
+                foreach ($kids_list as $kid) {
+                    if ($kid['kid_id'] != $kid_id) {
+                        $updated_list[] = $kid; // Keep all except the removed one
+                    } else {
+                        $kid_removed = true;
+                    }
+                }
+
+                // Only update if the kid was actually removed
+                if ($kid_removed) {
+                    update_field('kids_list', $updated_list, $group_post->ID);
+                }
+            }
+        }
+
+        // Return a success response
+        wp_send_json_success('Groups updated successfully!');
+    } else {
+        wp_send_json_error('Required data missing.');
+    }
+
+    wp_die();
+}
+
+function checkGroup($order_id, $kid_id) {
+    // Clean the $order_id and $kid_id by removing leading/trailing spaces
+    $order_id = trim($order_id);  // Remove leading/trailing spaces
+    $kid_id = trim($kid_id);      // Remove leading/trailing spaces
+
+    // Check if order_id and kid_id are set
+    if (empty($order_id) || empty($kid_id)) {
+        return 'No group'; // Return if either ID is missing
+    }
+
+    // Assuming 'camp-group' is a custom post type and 'kids_list' is the repeater field
+    $groups = [];
+    
+    // Query the camp-group posts
+    $args = [
+        'post_type' => 'camp-group',
+        'posts_per_page' => -1 // Get all posts
+    ];
+    
+    $camp_groups = get_posts($args); // Get all camp-group posts
+    
+    // Loop through each camp-group post
+    if ($camp_groups) {
+        foreach ($camp_groups as $group_post) {
+            // Get the kids list from the current group post
+            $kids_list = get_field('kids_list', $group_post->ID); // Adjust field name as necessary
+
+            // If kids_list exists, loop through each kid
+            if ($kids_list) {
+                foreach ($kids_list as $kid) {
+                    // Clean the kid_id and order_id from the repeater field in each group
+                    $kid_order_id = trim($kid['order_id']);
+                    $kid_kid_id = trim($kid['kid_id']);
+                    
+                    // Check if this group contains the kid (based on order_id and kid_id)
+                    if ($kid_order_id == $order_id && $kid_kid_id == $kid_id) {
+                        // The group is represented by the 'camp-group' post, so get the post title
+                        $groups[] = get_the_title($group_post->ID); // Get the camp-group post title
+                    }
+                }
+            }
+        }
+    }
+
+    // If no groups found, return "No group"
+    if (empty($groups)) {
+        return 'No group';
+    }
+
+    // Return a string of group names, formatted as "Group: group_name_1, group_name_2"
+    return '' . implode(', ', $groups);
+}
+
+
+
 
 
 // -------------------------
@@ -257,95 +428,161 @@ function updatePostGroups() {
                             }
                         }
                         ?>
-                <tr>
-                    <td><a class="link-dm"
-                            href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
+                <?php $order_id = $order->get_id() ?? null; ?>
+                <tr order-data-tabel-id="<?php echo $order_id; ?>">
+                    <td>
+                        <?php 
+                        $order_id = $order->get_id() ?? null;
+                        $order_link = '<a class="link-dm" href="' . $order_url . '">#' . esc_html($order_id) . '</a>';
+                        echo $order_link;
+                        ?>
                     </td>
                     <td>
-                        <p>תַאֲרִיך: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
-                        <p>
-                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show
-                        more</button>
-                        <div class="show-more-details" style="display: none;">
-                            <p> לָקוּחַ:
-                                <?php
-                                        $customer_id = $order->get_customer_id();
-                                        if ($customer_id) {
-                                            $user = get_user_by('id', $customer_id);
-                                            echo $user ? esc_html($user->display_name) : 'Guest';
-                                        } else {
-                                            echo 'Guest';
-                                        }
-                                        ?>
-                            </p>
-                            <p>תַאֲרִיך: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
-                            <p>סטָטוּס: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
-                            <p>סַך הַכֹּל: <?php echo $order->get_formatted_order_total(); ?></p>
-                            <p>
-                                <a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
-                            </p>
-                        </div>
-                    </p>
-
-
-                    </td>
-                    <td>
-                        <a href="<?php echo esc_url(get_permalink($product_id)); ?>" class="link-dm">
-                            <?php echo esc_html($product_name); ?>
-                        </a>
-                    </td>
-                    <td><?php echo cleanMetaValue($child_name) ? showChildUrl(cleanMetaValue($child_name), cleanMetaValue($child_id)) : 'N/A'; ?>
-                    </td>
-                    <td>
-                        <p>
-                        ID: <?php echo cleanMetaValue($child_id) ? cleanMetaValue($child_id) : 'N/A'; ?>
-                        </p>
-
+                        <?php $order_date = $order->get_date_created()->date('Y-m-d') ?? null; ?>
+                        <p>תַאֲרִיך: <?php echo $order_date; ?></p>
                         <p>
                             <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
-
                             <div class="show-more-details" style="display: none;">
-                                <div class="acf-fields kid-details">
-                                    <p>ת.ז. הילד:
-                                        <?php
-                                        $postChildId = getChildPostId(cleanMetaValue($child_id));
-                                        echo $postChildId;
-                                        ?>
-                                    </p>
-                                    <p>מְחַבֵּר:
-                                        <?php if($postChildId) {
-                                            $author_id = get_post_field('post_author', $postChildId);
-                                            echo $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
-                                        }
-                                        ?>
-                                    </p>
 
-                                    <?php
-                                    // Get the child post ID and display custom fields
-                                    
-                                    if ($postChildId) {
-                                        customFieldsOfPost($postChildId);
-                                    }
-                                    ?>
-                                </div>
+                                <?php
+                                $order_details = '
+                                <p> לָקוּחַ: ';
 
+                                $customer_id = $order->get_customer_id();
+                                if ($customer_id) {
+                                    $user = get_user_by('id', $customer_id);
+                                    $order_details .= $user ? esc_html($user->display_name) : 'Guest';
+                                } else {
+                                    $order_details .= 'Guest';
+                                }
+
+                                $order_details .= '</p>
+                                <p>תַאֲרִיך: ' . $order->get_date_created()->date('Y-m-d') . '</p>
+                                <p>סטָטוּס: ' . wc_get_order_status_name($order->get_status()) . '</p>
+                                <p>סַך הַכֹּל: ' . $order->get_formatted_order_total() . '</p>
+                                <p>
+                                    <a class="link-dm" href="' . esc_url($order->get_edit_order_url()) . '">Edit</a>
+                                </p>';
+
+                                // Output the stored HTML variable
+                                echo $order_details;
+                                ?>
                             </div>
                         </p>
                     </td>
+                    <td>
+                        <?php
+                        $product_details = '
+                        <a href="' . esc_url(get_permalink($item->get_product_id())) . '" class="link-dm">
+                            ' . esc_html($product_name) . '
+                        </a>
+                        <p>
+                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+                            <div class="show-more-details" style="display: none;">';
+
+                            // Capture the output of getCustomFieldsFromProductOrder() into a variable
+                            ob_start();
+                            getCustomFieldsFromProductOrder($item);
+                            $product_details .= ob_get_clean();
+
+                        $product_details .= '
+                            </div>
+                        </p>';
+
+                        // Output the stored HTML variable
+                        echo $product_details;
+                        ?>
+                    </td>
+
+                    <td>
+                        <?php 
+                        $child_name = isset($child_name) ? cleanMetaValue($child_name) : null;
+                        $child_id = isset($child_id) ? cleanMetaValue($child_id) : null;
+
+                        $child_url = ($child_name && $child_id) ? showChildUrl($child_name, $child_id) : null;
+
+                        echo $child_url ?? 'N/A';
+                        ?>
+                    </td>
+                    <td>
+                        <p>
+                        ID: <?php echo $child_id ? $child_id : 'N/A'; ?>
+                        </p>
+                        <?php
+                        $postChildId = getChildPostId(cleanMetaValue($child_id));
+
+                        // Start building the HTML content for child details
+                        $child_details = '
+                        <p>
+                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+
+                            <div class="show-more-details" style="display: none;">
+                        ';
+
+                        // Add the child ID
+                        $child_details .= '<p>ת.ז. הילד: ' . ($postChildId ? esc_html($postChildId) : 'N/A') . '</p>';
+
+                        if ($postChildId) {
+                            $author_id = get_post_field('post_author', $postChildId);
+                            $author_name = $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
+                            $child_details .= '<p>מְחַבֵּר: ' . $author_name . '</p>';
+
+                            // Capture and add custom fields
+                            ob_start();
+                            customFieldsOfPost($postChildId);
+                            $child_details .= ob_get_clean();
+                        }
+
+                        // Close the show-more-details and the p tag
+                        $child_details .= $child_url;
+                        $child_details .= '
+                            </div>
+                        </p>
+                        ';
+
+                        // Now echo the child details
+                        echo $child_details;
+
+                        ?>
+
+                    </td>
                     <td class="group-td">
+                        <p>
+                            <?php 
+                            // Call the checkGroup function with order_id and kid_id
+                            echo checkGroup($order_id, $child_id);
+                            ?>
+                        </p>
+
                         <p>
                             <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
                             <div class="show-more-details" style="display: none;">
-                                <!-- Group checkboxes instead of select -->
-                                <div id="group-checkboxes">
-                                    <p><input type="checkbox" id="no-groups" value="no-groups"> No Groups</p>
-                                    <p><input type="checkbox" id="all-groups" value="all-groups"> All Groups</p>
+                                <div class="group-checkboxes">
+                                    <p><input type="checkbox" value="no-group" class="no-group"> No group</p>
                                     <?php echo get_all_groups_checkboxes(); ?> <!-- Dynamically load more checkboxes here -->
                                 </div>
+                                <button type="button" class="btn-dm" name="manage-groups" onclick="updatePostGroups(this)" 
+                                    kid_id="<?php echo esc_attr($child_id); ?>"
+                                    kid_name="<?php echo esc_attr($child_name); ?>"
+                                    order_id="<?php echo esc_attr($order_id); ?>"
+                                    order_date="<?php echo esc_attr($order_date); ?>">
+                                    Apply
+                                </button>
 
-                                <!-- Apply button -->
-                                <button type="button" class="btn-dm" name="manage-groups" onclick="updatePostGroups()">Apply</button>
-                            </div>     
+                                <!-- JSON Data Storage -->
+                                <script type="application/json" id="kid-data-<?php echo esc_attr($child_id); ?>">
+                                    <?php echo json_encode([
+                                        'kid_id' => $child_id,
+                                        'kid_name' => $child_name,
+                                        'kid_details' => $child_details,
+                                        'order_id' => $order_id,
+                                        'order_date' => $order_date,
+                                        'order_details' => $order_details,
+                                        'product_details' => $product_details
+                                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                </script>
+
+                            </div>
                         </p>
                     </td>
 
@@ -384,7 +621,12 @@ function updatePostGroups() {
         background: #0073aa;
         color: white;
     }
-
+    #products-from-orders {
+        min-width: 800px;
+    }
+    #products-from-orders p {
+        margin-bottom: 4px;
+    }
     #products-from-order .tab-content {
         display: none;
     }
@@ -461,6 +703,10 @@ function updatePostGroups() {
     #products-from-orders .acf-fields .field-label {
         font-weight: 500;
     }
+
+    #products-from-orders tr[order-data-tabel-id="6452"] {
+        background-color: #e4eef7;
+    }
     </style>
 
     <?php
@@ -487,6 +733,99 @@ function updatePostGroups() {
             }
         }
     }
+
+    function updatePostGroups(button) {
+    // Extract the kid data from the script tag
+    const kidDataScript = document.getElementById(`kid-data-${button.getAttribute('kid_id')}`);
+    if (!kidDataScript) {
+        console.error('Kid data script not found!');
+        return;
+    }
+
+    // Parse the JSON data
+    let kidData;
+    try {
+        kidData = JSON.parse(kidDataScript.textContent);
+    } catch (e) {
+        console.error('Failed to parse kid data:', e);
+        return;
+    }
+
+    // Ensure kid data exists before proceeding
+    if (!kidData || !kidData.kid_id || !kidData.kid_name) {
+        console.error('Incomplete kid data!');
+        return;
+    }
+
+    // Check if the kid data is not empty
+    console.log("Kid Data:", kidData);  // Debugging log to check what is fetched
+
+    // Find the closest parent `.show-more-details` container of the clicked button
+    const showMoreDetailsContainer = button.closest('.show-more-details');
+    if (!showMoreDetailsContainer) {
+        console.error('No .show-more-details container found!');
+        return;
+    }
+
+    // Find the `.group-checkboxes` within the `.show-more-details` container
+    const groupCheckboxesContainer = showMoreDetailsContainer.querySelector('.group-checkboxes');
+    if (!groupCheckboxesContainer) {
+        console.error('No .group-checkboxes container found!');
+        return;
+    }
+
+    // Get selected groups
+    const selectedGroups = [];
+    
+    // Check if "No group" is selected (using class selector)
+    const noGroupCheckbox = groupCheckboxesContainer.querySelector(".no-group-checkbox:checked");
+    if (noGroupCheckbox) {
+        selectedGroups.push("no-group"); // Ensure "No group" is the only value
+    } else {
+        // Get all selected checkboxes except "No group"
+        groupCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked').forEach((checkbox) => {
+            selectedGroups.push(checkbox.value);
+        });
+    }
+
+    // Prepare the data for the AJAX request
+    const data = {
+        action: "update_groups_for_kid",
+        groups: selectedGroups,
+        kid_id: kidData.kid_id,
+        kid_name: kidData.kid_name,
+        kid_details: kidData.kid_details,
+        order_id: kidData.order_id,
+        order_date: kidData.order_date,
+        order_details: kidData.order_details,
+        product_details: kidData.product_details
+    };
+
+    console.log("Data to send:", data);  // Debugging log to check the data being sent
+
+    // Make an AJAX request to update the posts
+    jQuery.post(ajaxurl, data, function(response) {
+        if (response.success) {
+            if (selectedGroups.includes("no-group")) {
+                alert("Kid removed from all groups.");
+            } else {
+                alert("Groups updated successfully!");
+            }
+        } else {
+            alert("Error updating groups.");
+        }
+    });
+}
+
+
+
+
+
+
+
+
+
+
 
 </script>
 
