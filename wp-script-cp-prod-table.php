@@ -169,15 +169,17 @@ function all_orders_with_products_shortcode()
                                     }
                                     ?>
                                 </p>
-                                <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?>
-                                </p>
-                                <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?>
-                                </p>
-                                <p>Total: <?php echo $order->get_formatted_order_total(); ?>
-                                </p>
-                                <p>
-                                    <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
-                                </p>
+
+                                <button type="button" class="show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+
+                                <div class="order-details" style="display: none;">
+                                    <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
+                                    <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
+                                    <p>Total: <?php echo $order->get_formatted_order_total(); ?></p>
+                                    <p>
+                                        <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
+                                    </p>
+                                </div>
                             </td>
                             <td><?php echo esc_html($product_name); ?></td>
                             <td><?php echo $child_name ? showChildUrl($child_name, $child_id) : 'N/A'; ?></td>
@@ -259,7 +261,16 @@ function all_orders_with_products_shortcode()
     ?>
 
     <script>
-
+        function toggleOrderDetails(button) {
+            var details = button.nextElementSibling;
+            if (details.style.display === "none") {
+                details.style.display = "block";
+                button.textContent = "Show less";
+            } else {
+                details.style.display = "none";
+                button.textContent = "Show more";
+            }
+        }
     </script>
 
     <?php
