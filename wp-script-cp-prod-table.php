@@ -105,10 +105,6 @@ function all_orders_with_products_shortcode()
 
     ob_start();
     ?>
-    <div class="woocommerce-orders-tabs">
-        <button class="orders-tab active" onclick="showTab('orders')">Orders</button>
-        <button class="orders-tab" onclick="showTab('products')">Products</button>
-    </div>
 
     <div class="woocommerce-orders-filters">
         <label>Product:
@@ -263,12 +259,7 @@ function all_orders_with_products_shortcode()
     ?>
 
     <script>
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.orders-tab').forEach(button => button.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
-        }
+
     </script>
 
     <?php
