@@ -182,8 +182,8 @@ function all_orders_with_products_shortcode()
                                 </div>
                             </td>
                             <td><?php echo esc_html($product_name); ?></td>
-                            <td><?php echo $child_name ? showChildUrl($child_name, $child_id) : 'N/A'; ?></td>
-                            <td><?php echo $child_id ? $child_id : 'N/A'; ?></td>
+                            <td><?php echo $child_name ? showChildUrl(cleanMetaValue($child_name), cleanMetaValue($child_id)) : 'N/A'; ?></td>
+                            <td><?php echo $child_id ? cleanMetaValue($child_id) : 'N/A'; ?></td>
                         </tr>
                     <?php endforeach;
                 endforeach; ?>
