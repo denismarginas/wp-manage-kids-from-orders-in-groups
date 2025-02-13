@@ -251,15 +251,15 @@ function all_orders_with_products_shortcode()
         .btn-dm {
             font-size: 16px;
             padding: 4px 12px;
-            border: 1px solid #0073aa;
+            border: 1px solid #0073aa !important;
             line-height: 18px;
             border-radius: 6px;
-            background-color: #fff;
-            color: #0073aa;
+            background-color: #fff !important;
+            color: #0073aa !important;
         }
-        .btn-dm :hover {
-            color: #fff;
-            background-color: #0073aa;
+        .btn-dm:hover, .btn-dm:focus {
+            color: #fff !important;
+            background-color: #0073aa !important;
         }
         .woocommerce-orders-filters select, .woocommerce-orders-filters input {
             font-size: 16px;
