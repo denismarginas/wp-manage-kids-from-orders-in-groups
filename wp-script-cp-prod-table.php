@@ -106,39 +106,39 @@ function all_orders_with_products_shortcode()
     ob_start();
     ?>
 
-    <div class="woocommerce-orders-filters">
-        <label>Product:
-            <select id="product-filter">
-                <option value="all">All Products</option>
-                <?php echo get_all_products(); ?>
-            </select>
-        </label>
-        <label>Group:
-            <select id="group-filter">
-                <option value="no-groups">No Groups</option>
-                <option value="all-groups">All Groups</option>
-                <?php echo get_all_groups(); ?>
-            </select>
-        </label>
-        <label>Age: <input type="number" id="age-filter" placeholder="Enter Age"></label>
-        <label>From Date: <input type="text" id="date-filter"
-                value="<?php echo date('d-m-Y', strtotime('-7 days')); ?>"></label>
-        <button onclick="applyFilters()">Filter</button>
-    </div>
+<div class="woocommerce-orders-filters">
+    <label>Product:
+        <select id="product-filter">
+            <option value="all">All Products</option>
+            <?php echo get_all_products(); ?>
+        </select>
+    </label>
+    <label>Group:
+        <select id="group-filter">
+            <option value="no-groups">No Groups</option>
+            <option value="all-groups">All Groups</option>
+            <?php echo get_all_groups(); ?>
+        </select>
+    </label>
+    <label>Age: <input type="number" id="age-filter" placeholder="Enter Age"></label>
+    <label>From Date: <input type="text" id="date-filter"
+            value="<?php echo date('d-m-Y', strtotime('-7 days')); ?>"></label>
+    <button onclick="applyFilters()">Filter</button>
+</div>
 
-    <div id="products-from-orders" class="tab-content active">
-        <table class="woocommerce-orders-table">
-            <thead>
-                <tr>
-                    <th>Order ID</th>
-                    <th>Order Details</th>
-                    <th>Product</th>
-                    <th>Child's Name</th>
-                    <th>Child ID</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($orders as $order):
+<div id="products-from-orders" class="tab-content active">
+    <table class="woocommerce-orders-table">
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Order Details</th>
+                <th>Product</th>
+                <th>Child's Name</th>
+                <th>Child ID</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($orders as $order):
                     foreach ($order->get_items() as $item_id => $item):
                         $product_name = $item->get_name();
                         $child_name = '';
@@ -154,12 +154,12 @@ function all_orders_with_products_shortcode()
                             }
                         }
                         ?>
-                        <tr>
-                            <td><a href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
-                            </td>
-                            <td>
-                                <p> Customer:
-                                    <?php
+            <tr>
+                <td><a href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
+                </td>
+                <td>
+                    <p> Customer:
+                        <?php
                                     $customer_id = $order->get_customer_id();
                                     if ($customer_id) {
                                         $user = get_user_by('id', $customer_id);
@@ -168,29 +168,29 @@ function all_orders_with_products_shortcode()
                                         echo 'Guest';
                                     }
                                     ?>
-                                </p>
+                    </p>
 
-                                <button type="button" class="show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+                    <button type="button" class="show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
 
-                                <div class="order-details" style="display: none;">
-                                    <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
-                                    <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
-                                    <p>Total: <?php echo $order->get_formatted_order_total(); ?></p>
-                                    <p>
-                                        <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
-                                    </p>
-                                </div>
-                            </td>
-                            <td><?php echo esc_html($product_name); ?></td>
-                            <td><?php echo $child_name ? showChildUrl($child_name, $child_id) : 'N/A'; ?></td>
-                            <td><?php echo $child_id ? $child_id : 'N/A'; ?></td>
-                        </tr>
-                    <?php endforeach;
+                    <div class="order-details" style="display: none;">
+                        <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
+                        <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
+                        <p>Total: <?php echo $order->get_formatted_order_total(); ?></p>
+                        <p>
+                            <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
+                        </p>
+                    </div>
+                </td>
+                <td><?php echo esc_html($product_name); ?></td>
+                <td><?php echo $child_name ? showChildUrl($child_name, $child_id) : 'N/A'; ?></td>
+                <td><?php echo $child_id ? $child_id : 'N/A'; ?></td>
+            </tr>
+            <?php endforeach;
                 endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php
+        </tbody>
+    </table>
+</div>
+<?php
     // -------------------------
 // Define Main Function - End
 // -------------------------
@@ -201,55 +201,55 @@ function all_orders_with_products_shortcode()
 
     ?>
 
-    <style>
-        .woocommerce-orders-tabs {
-            margin-bottom: 15px;
-        }
+<style>
+.woocommerce-orders-tabs {
+    margin-bottom: 15px;
+}
 
-        .orders-tab {
-            padding: 10px 15px;
-            cursor: pointer;
-            border: none;
-            background: #ddd;
-            margin-right: 5px;
-        }
+.orders-tab {
+    padding: 10px 15px;
+    cursor: pointer;
+    border: none;
+    background: #ddd;
+    margin-right: 5px;
+}
 
-        .orders-tab.active {
-            background: #0073aa;
-            color: white;
-        }
+.orders-tab.active {
+    background: #0073aa;
+    color: white;
+}
 
-        .tab-content {
-            display: none;
-        }
+.tab-content {
+    display: none;
+}
 
-        .tab-content.active {
-            display: block;
-            background-color: #fff !important;
-        }
+.tab-content.active {
+    display: block;
+    background-color: #fff !important;
+}
 
-        .tab-content a {
-            color: #0073aa !important;
-        }
+.tab-content a {
+    color: #0073aa !important;
+}
 
-        .woocommerce-orders-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+.woocommerce-orders-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-        .woocommerce-orders-table th,
-        .woocommerce-orders-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
+.woocommerce-orders-table th,
+.woocommerce-orders-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
 
-        .woocommerce-orders-table th {
-            background-color: #f4f4f4;
-        }
-    </style>
+.woocommerce-orders-table th {
+    background-color: #f4f4f4;
+}
+</style>
 
-    <?php
+<?php
 
     // -------------------------
 // Custom CSS - End
@@ -260,20 +260,20 @@ function all_orders_with_products_shortcode()
 // -------------------------
     ?>
 
-    <script>
-        function toggleOrderDetails(button) {
-            var details = button.nextElementSibling;
-            if (details.style.display === "none") {
-                details.style.display = "block";
-                button.textContent = "Show less";
-            } else {
-                details.style.display = "none";
-                button.textContent = "Show more";
-            }
-        }
-    </script>
+<script>
+function toggleOrderDetails(button) {
+    var details = button.nextElementSibling;
+    if (details.style.display === "none") {
+        details.style.display = "block";
+        button.textContent = "Show less";
+    } else {
+        details.style.display = "none";
+        button.textContent = "Show more";
+    }
+}
+</script>
 
-    <?php
+<?php
     // -------------------------
 // Custom JS - End
 // -------------------------
