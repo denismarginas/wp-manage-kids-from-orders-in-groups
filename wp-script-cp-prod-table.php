@@ -1,28 +1,35 @@
+<?php
+
 function cleanMetaValue($value)
 {
     if (empty($value)) {
         return 'N/A';
     }
     $value = preg_replace('/<span class="woocommerce-Price-currencySymbol.*?<\/span>/si', '', $value);
-    $value = preg_replace('/<span class="woocommerce-Price-amount.*?<\/span>/si', '', $value);
+    $value = preg_replace('/<span class=" woocommerce-Price-amount.*?<\/span>/si', '', $value);
 
     return $value;
 }
 
-function get_all_products() {
+function get_all_products()
+{
     $products = wc_get_products(array('limit' => -1));
-    if (empty($products)) return '<option value="">No Products Found</option>';
+    if (empty($products))
+        return '<option value="">No Products Found</option>';
 
     $product_options = '';
     foreach ($products as $product) {
-        $product_options .= '<option value="' . esc_attr($product->get_id()) . '">' . esc_html($product->get_name()) . '</option>';
+        $product_options .= '<option value="' . esc_attr($product->get_id()) . '">' . esc_html($product->get_name()) . '
+    </option>';
     }
     return $product_options;
 }
 
-function get_all_groups() {
+function get_all_groups()
+{
     $groups = get_posts(array('post_type' => 'camp-group', 'numberposts' => -1));
-    if (empty($groups)) return '<option value="">No Groups Found</option>';
+    if (empty($groups))
+        return '<option value="">No Groups Found</option>';
 
     $group_options = '';
     foreach ($groups as $group) {
@@ -58,7 +65,7 @@ function showChildUrl($child_name, $child_id)
 
         // Return the anchor tag with the URL and child name
         return '<a href="' . esc_url($post_url) . '">' . esc_html($child_name) . '</a>';
-    } 
+    }
 
     // If no post is found, return the child name as plain text
     return esc_html($child_name);
@@ -100,17 +107,17 @@ function all_orders_with_products_shortcode()
 
     <div class="woocommerce-orders-filters">
         <label>Product:
-        <select id="product-filter">
-            <option value="all">All Products</option>
-            <?php echo get_all_products(); ?>
-        </select>
+            <select id="product-filter">
+                <option value="all">All Products</option>
+                <?php echo get_all_products(); ?>
+            </select>
         </label>
         <label>Group:
-        <select id="group-filter">
-            <option value="no-groups">No Groups</option>
-            <option value="all-groups">All Groups</option>
-            <?php echo get_all_groups(); ?>
-        </select>
+            <select id="group-filter">
+                <option value="no-groups">No Groups</option>
+                <option value="all-groups">All Groups</option>
+                <?php echo get_all_groups(); ?>
+            </select>
         </label>
         <label>Age: <input type="number" id="age-filter" placeholder="Enter Age"></label>
         <label>From Date: <input type="text" id="date-filter"
