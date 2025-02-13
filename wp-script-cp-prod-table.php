@@ -3,6 +3,7 @@
 // -------------------------
 // Define Functions - Start
 // -------------------------
+
 function cleanMetaValue($value) {
     if (empty($value)) {
         return 'N/A';
@@ -339,20 +340,15 @@ function checkGroup($order_id, $kid_id) {
     return '' . implode(', ', $groups);
 }
 
-
-
-
-
 // -------------------------
 // Define Functions - End
 // -------------------------
 
+// -------------------------
+// Define Main Function - Start
+// -------------------------
 
-
-    // -------------------------
-    // Define Main Function - Start
-    // -------------------------
-    function all_orders_with_products_shortcode()
+function all_orders_with_products_shortcode()
     {
     if (!current_user_can('manage_woocommerce')) {
     return '<p>You do not have permission to view all orders.</p>';
@@ -593,18 +589,18 @@ function checkGroup($order_id, $kid_id) {
             </tbody>
         </table>
     </div>
-    <?php
-    // -------------------------
+<?php
+// -------------------------
 // Define Main Function - End
 // -------------------------
 
-    // -------------------------
+// -------------------------
 // Custom CSS - Start
 // -------------------------
 
-    ?>
+?>
 
-    <style>
+<style>
     #products-from-order .woocommerce-orders-tabs {
         margin-bottom: 15px;
     }
@@ -707,18 +703,17 @@ function checkGroup($order_id, $kid_id) {
     #products-from-orders tr[order-data-tabel-id="6452"] {
         background-color: #e4eef7;
     }
-    </style>
+</style>
 
-    <?php
-
-    // -------------------------
+<?php
+// -------------------------
 // Custom CSS - End
 // -------------------------
 
-    // -------------------------
+// -------------------------
 // Custom JS - Start
 // -------------------------
-    ?>
+?>
 
 <script>
     function toggleOrderDetails(button) {
@@ -819,8 +814,9 @@ function checkGroup($order_id, $kid_id) {
 
 </script>
 
-    <?php
-    // -------------------------
+<?php
+
+// -------------------------
 // Custom JS - End
 // -------------------------
 
