@@ -817,16 +817,6 @@ function checkGroup($order_id, $kid_id) {
     });
 }
 
-
-
-
-
-
-
-
-
-
-
 </script>
 
     <?php
