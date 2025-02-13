@@ -512,7 +512,7 @@ function all_orders_with_products_shortcode()
                         <p>
                             <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
 
-                            <div class="show-more-details" style="display: none;">
+                            <div class="show-more-details" style="display: none;"><div class="kid-details">
                         ';
 
                         // Add the child ID
@@ -532,6 +532,7 @@ function all_orders_with_products_shortcode()
                         // Close the show-more-details and the p tag
                         $child_details .= $child_url;
                         $child_details .= '
+                                </div>
                             </div>
                         </p>
                         ';
