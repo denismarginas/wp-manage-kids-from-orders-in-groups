@@ -64,7 +64,7 @@ function showChildUrl($child_name, $child_id)
         $post_url = get_permalink($post->ID);
 
         // Return the anchor tag with the URL and child name
-        return '<a href="' . esc_url($post_url) . '">' . esc_html($child_name) . '</a>';
+        return '<a class="link-dm" href="' . esc_url($post_url) . '">' . esc_html($child_name) . '</a>';
     }
 
     // If no post is found, return the child name as plain text
@@ -155,7 +155,7 @@ function all_orders_with_products_shortcode()
                         }
                         ?>
                         <tr>
-                            <td><a href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
+                            <td><a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
                             </td>
                             <td>
                                 <p> Customer:
@@ -177,7 +177,7 @@ function all_orders_with_products_shortcode()
                                     <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
                                     <p>Total: <?php echo $order->get_formatted_order_total(); ?></p>
                                     <p>
-                                        <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
+                                        <a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
                                     </p>
                                 </div>
                             </td>
@@ -228,7 +228,7 @@ function all_orders_with_products_shortcode()
             background-color: #fff !important;
         }
 
-        #products-from-order.tab-content a {
+        .link-dm {
             color: #0073aa !important;
         }
 
