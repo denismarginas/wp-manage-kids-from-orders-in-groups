@@ -189,7 +189,7 @@ function all_orders_with_products_shortcode()
                 endforeach; ?>
             </tbody>
         </table>
-    </div>
+    </div> 
     <?php
     // -------------------------
 // Define Main Function - End
