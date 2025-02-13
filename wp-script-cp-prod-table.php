@@ -1,5 +1,7 @@
 <?php
-
+// -------------------------
+// Define Functions - Start
+// -------------------------
 function cleanMetaValue($value)
 {
     if (empty($value)) {
@@ -38,8 +40,6 @@ function get_all_groups()
     return $group_options;
 }
 
-
-
 function showChildUrl($child_name, $child_id)
 {
     if (empty($child_name) || ($child_name == 'N/A') || empty($child_id)) {
@@ -70,10 +70,15 @@ function showChildUrl($child_name, $child_id)
     // If no post is found, return the child name as plain text
     return esc_html($child_name);
 }
+// -------------------------
+// Define Functions - End
+// -------------------------
 
 
 
-
+// -------------------------
+// Define Main Function - Start
+// -------------------------
 function all_orders_with_products_shortcode()
 {
     if (!current_user_can('manage_woocommerce')) {
@@ -125,54 +130,15 @@ function all_orders_with_products_shortcode()
         <button onclick="applyFilters()">Filter</button>
     </div>
 
-    <div id="orders" class="tab-content active">
+    <div id="products-from-orders" class="tab-content active">
         <table class="woocommerce-orders-table">
             <thead>
                 <tr>
                     <th>Order ID</th>
-                    <th>Customer</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Total</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($orders as $order): ?>
-                    <tr>
-                        <td>#<?php echo $order->get_id(); ?></td>
-                        <td>
-                            <?php
-                            $customer_id = $order->get_customer_id();
-                            if ($customer_id) {
-                                $user = get_user_by('id', $customer_id);
-                                echo $user ? esc_html($user->display_name) : 'Guest';
-                            } else {
-                                echo 'Guest';
-                            }
-                            ?>
-                        </td>
-                        <td><?php echo $order->get_date_created()->date('Y-m-d'); ?></td>
-                        <td><?php echo wc_get_order_status_name($order->get_status()); ?></td>
-                        <td><?php echo $order->get_formatted_order_total(); ?></td>
-                        <td>
-                            <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <div id="products" class="tab-content">
-        <table class="woocommerce-orders-table">
-            <thead>
-                <tr>
-                    <th>Order ID</th>
+                    <th>Order Details</th>
                     <th>Product</th>
                     <th>Child's Name</th>
                     <th>Child ID</th>
-                    <th>Quantity</th>
                 </tr>
             </thead>
             <tbody>
@@ -193,17 +159,49 @@ function all_orders_with_products_shortcode()
                         }
                         ?>
                         <tr>
-                            <td>#<?php echo $order->get_id(); ?></td>
+                            <td><a href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
+                            </td>
+                            <td>
+                                <p> Customer:
+                                    <?php
+                                    $customer_id = $order->get_customer_id();
+                                    if ($customer_id) {
+                                        $user = get_user_by('id', $customer_id);
+                                        echo $user ? esc_html($user->display_name) : 'Guest';
+                                    } else {
+                                        echo 'Guest';
+                                    }
+                                    ?>
+                                </p>
+                                <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?>
+                                </p>
+                                <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?>
+                                </p>
+                                <p>Total: <?php echo $order->get_formatted_order_total(); ?>
+                                </p>
+                                <p>
+                                    <a href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
+                                </p>
+                            </td>
                             <td><?php echo esc_html($product_name); ?></td>
                             <td><?php echo $child_name ? showChildUrl($child_name, $child_id) : 'N/A'; ?></td>
                             <td><?php echo $child_id ? $child_id : 'N/A'; ?></td>
-                            <td><?php echo $item->get_quantity(); ?></td>
                         </tr>
                     <?php endforeach;
                 endforeach; ?>
             </tbody>
         </table>
     </div>
+    <?php
+    // -------------------------
+// Define Main Function - End
+// -------------------------
+
+    // -------------------------
+// Custom CSS - Start
+// -------------------------
+
+    ?>
 
     <style>
         .woocommerce-orders-tabs {
@@ -253,6 +251,17 @@ function all_orders_with_products_shortcode()
         }
     </style>
 
+    <?php
+
+    // -------------------------
+// Custom CSS - End
+// -------------------------
+
+    // -------------------------
+// Custom JS - Start
+// -------------------------
+    ?>
+
     <script>
         function showTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -263,7 +272,19 @@ function all_orders_with_products_shortcode()
     </script>
 
     <?php
+    // -------------------------
+// Custom JS - End
+// -------------------------
+
     return ob_get_clean();
 }
 
+// -------------------------
+// Custom Shortcode - Start
+// -------------------------
+
 add_shortcode('all_orders_with_products', 'all_orders_with_products_shortcode');
+
+// -------------------------
+// Custom Shortcode - End
+// -------------------------
