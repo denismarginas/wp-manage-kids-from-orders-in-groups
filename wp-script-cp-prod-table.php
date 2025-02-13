@@ -1,4 +1,4 @@
-
+<?php
 
 // -------------------------
 // Define Functions - Start
