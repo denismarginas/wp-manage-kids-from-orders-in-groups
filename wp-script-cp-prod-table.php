@@ -1,16 +1,46 @@
 <?php
+
 // -------------------------
 // Define Functions - Start
 // -------------------------
-function cleanMetaValue($value)
-{
+function cleanMetaValue($value) {
     if (empty($value)) {
         return 'N/A';
     }
-    $value = preg_replace('/<span class="woocommerce-Price-currencySymbol.*?<\/span>/si', '', $value);
-    $value = preg_replace('/<span class=" woocommerce-Price-amount.*?<\/span>/si', '', $value);
+	$value = preg_replace('/<span class="woocommerce-Price-currencySymbol.*?<\/span>/si', '', $value);
+	$value = preg_replace('/<span class="woocommerce-Price-amount.*?<\/span>/si', '', $value);
 
-    return $value;
+	return $value;
+}
+
+function showChildUrl($child_name, $child_id) {
+    if(empty($child_name) || ($child_name == 'N/A') || empty($child_id)) {
+        return $child_name;
+    }
+
+    $args = array(
+        'post_type' => 'kids',
+        'meta_key' => 'kid_id', // The ACF field key
+        'meta_value' => $child_id, // The value to match against
+        'posts_per_page' => 1, // Only fetch one post
+        'post_status' => 'publish', // Ensure the post is published
+    );
+
+    $query = new WP_Query($args);
+
+    if ($query->have_posts()) {
+        // Get the first post found
+        $post = $query->posts[0];
+
+        // Generate the post URL
+        $post_url = get_permalink($post->ID);
+
+        // Return the anchor tag with the URL and child name
+        return '<a class="link-dm" href="' . esc_url($post_url) . '">' . esc_html($child_name) . '</a>';
+    }
+
+    // If no post is found, return the child name as plain text
+    return esc_html($child_name);
 }
 
 function get_all_products()
@@ -39,68 +69,140 @@ function get_all_groups()
     }
     return $group_options;
 }
+function get_all_groups_checkboxes() {
+    // Fetch all 'camp-group' posts
+    $groups = get_posts(array(
+        'post_type' => 'camp-group',
+        'numberposts' => -1
+    ));
 
-function showChildUrl($child_name, $child_id)
-{
-    if (empty($child_name) || ($child_name == 'N/A') || empty($child_id)) {
-        return $child_name;
+    // If no groups found, return a message
+    if (empty($groups)) {
+        return '<p>No Groups Found</p>';
     }
 
+    // Initialize variable to store checkbox HTML
+    $group_options = '';
+
+    // Loop through each group and generate checkbox
+    foreach ($groups as $group) {
+        $group_options .= '<p><input type="checkbox" value="' . esc_attr($group->ID) . '" id="group-' . esc_attr($group->ID) . '"> ' . esc_html($group->post_title) . '</p>';
+    }
+
+    // Return the checkbox options
+    return $group_options;
+}
+
+
+function getChildPostId($kid_id) {
+    // Query the 'kids' custom post type to find the post where 'kid_id' field matches $kid_id
     $args = array(
-        'post_type' => 'kids',
-        'meta_key' => 'kid_id', // The ACF field key
-        'meta_value' => $child_id, // The value to match against
-        'posts_per_page' => 1, // Only fetch one post
-        'post_status' => 'publish', // Ensure the post is published
+        'post_type' => 'kids', // Custom post type 'kids'
+        'posts_per_page' => 1, // We only need one result
+        'meta_query' => array(
+            array(
+                'key'   => 'kid_id', // The ACF field to search
+                'value' => $kid_id,  // The value to match with
+                'compare' => '=',    // Comparison operator
+            ),
+        ),
     );
 
+    // Run the query
     $query = new WP_Query($args);
 
+    // Check if a post was found
     if ($query->have_posts()) {
-        // Get the first post found
-        $post = $query->posts[0];
-
-        // Generate the post URL
-        $post_url = get_permalink($post->ID);
-
-        // Return the anchor tag with the URL and child name
-        return '<a class="link-dm" href="' . esc_url($post_url) . '">' . esc_html($child_name) . '</a>';
+        // Get the post ID of the first post that matches the query
+        $post_id = $query->posts[0]->ID;
+        wp_reset_postdata(); // Reset the query after use
+        return $post_id;
     }
 
-    // If no post is found, return the child name as plain text
-    return esc_html($child_name);
+    // Return null if no matching post is found
+    return null;
 }
+
+// Function to display custom fields for a post
+function customFieldsOfPost($postId) {
+    // Retrieve all custom fields for the post
+    $all_fields = get_post_meta($postId);
+
+    // Check if any custom fields exist
+    if ($all_fields) {
+        foreach ($all_fields as $field_name => $field_value) {
+            // Retrieve the ACF field object to get the label
+            $field_object = get_field_object($field_name, $postId);
+            
+            // If the field exists in ACF and has a label
+            if ($field_object) {
+                $label = $field_object['label']; // Get the field label
+            } else {
+                // If no ACF field exists for this key, use the field name as fallback
+                $label = ucwords(str_replace('_', ' ', $field_name));
+            }
+
+            // Each $field_value is an array, so we get the first element (if it's not an empty array)
+            $value = isset($field_value[0]) ? $field_value[0] : '';
+
+            // If the field has a value, display it
+            if (!empty($value)) {
+                echo '<p><span class="field-label">' . esc_html($label) . ':</span> <span class="field-value">' . esc_html($value) . '</span></p>';
+            } else {
+                echo '<p>N/A: "' . esc_html($label) . '".</p>';
+            }
+        }
+    } else {
+        echo '<p>No custom fields found.</p>';
+    }
+}
+
+function updatePostGroups() {
+    // Get all checked checkboxes
+    //const checkedBoxes = document.querySelectorAll('#group-checkboxes input[type="checkbox"]:checked');
+    
+    // Prepare an array of the values of checked checkboxes
+    //const selectedGroups = Array.from(checkedBoxes).map(box => box.value);
+
+    // Example of what to do with the selected values
+    //console.log('Selected Groups:', selectedGroups);
+
+    // Perform necessary actions (e.g., send an AJAX request or update the post)
+    // For now, this can just log the selected groups to the console
+}
+
+
 // -------------------------
 // Define Functions - End
 // -------------------------
 
 
 
-// -------------------------
-// Define Main Function - Start
-// -------------------------
-function all_orders_with_products_shortcode()
-{
+    // -------------------------
+    // Define Main Function - Start
+    // -------------------------
+    function all_orders_with_products_shortcode()
+    {
     if (!current_user_can('manage_woocommerce')) {
-        return '<p>You do not have permission to view all orders.</p>';
+    return '<p>You do not have permission to view all orders.</p>';
     }
 
     $args = array(
-        'limit' => -1, // Get all orders
+    'limit' => -1, // Get all orders
     );
     $date_param = isset($_GET['date']) ? $_GET['date'] : date('d-m-Y', strtotime('-7 days'));
     $date = DateTime::createFromFormat('d-m-Y', $date_param);
     if ($date) {
-        $args['date_query'] = array(
-            'after' => $date->format('Y-m-d'),
-        );
+    $args['date_query'] = array(
+    'after' => $date->format('Y-m-d'),
+    );
     }
 
 
     $orders = wc_get_orders($args);
 
     if (!$orders) {
-        return '<p>No orders found.</p>';
+    return '<p>No orders found.</p>';
     }
 
     ob_start();
@@ -134,7 +236,8 @@ function all_orders_with_products_shortcode()
                     <th>Order Details</th>
                     <th>Product</th>
                     <th>Child's Name</th>
-                    <th>Child ID</th>
+                    <th>Child Details</th>
+                    <th>Group</th>
                 </tr>
             </thead>
             <tbody>
@@ -154,46 +257,105 @@ function all_orders_with_products_shortcode()
                             }
                         }
                         ?>
-                        <tr>
-                            <td><a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
-                            </td>
-                            <td>
-                                <p> Customer:
+                <tr>
+                    <td><a class="link-dm"
+                            href="<?php echo esc_url($order->get_edit_order_url()); ?>">#<?php echo $order->get_id(); ?></a>
+                    </td>
+                    <td>
+                        <p>תַאֲרִיך: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
+                        <p>
+                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show
+                        more</button>
+                        <div class="show-more-details" style="display: none;">
+                            <p> לָקוּחַ:
+                                <?php
+                                        $customer_id = $order->get_customer_id();
+                                        if ($customer_id) {
+                                            $user = get_user_by('id', $customer_id);
+                                            echo $user ? esc_html($user->display_name) : 'Guest';
+                                        } else {
+                                            echo 'Guest';
+                                        }
+                                        ?>
+                            </p>
+                            <p>תַאֲרִיך: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
+                            <p>סטָטוּס: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
+                            <p>סַך הַכֹּל: <?php echo $order->get_formatted_order_total(); ?></p>
+                            <p>
+                                <a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
+                            </p>
+                        </div>
+                    </p>
+
+
+                    </td>
+                    <td>
+                        <a href="<?php echo esc_url(get_permalink($product_id)); ?>" class="link-dm">
+                            <?php echo esc_html($product_name); ?>
+                        </a>
+                    </td>
+                    <td><?php echo cleanMetaValue($child_name) ? showChildUrl(cleanMetaValue($child_name), cleanMetaValue($child_id)) : 'N/A'; ?>
+                    </td>
+                    <td>
+                        <p>
+                        ID: <?php echo cleanMetaValue($child_id) ? cleanMetaValue($child_id) : 'N/A'; ?>
+                        </p>
+
+                        <p>
+                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+
+                            <div class="show-more-details" style="display: none;">
+                                <div class="acf-fields kid-details">
+                                    <p>ת.ז. הילד:
+                                        <?php
+                                        $postChildId = getChildPostId(cleanMetaValue($child_id));
+                                        echo $postChildId;
+                                        ?>
+                                    </p>
+                                    <p>מְחַבֵּר:
+                                        <?php if($postChildId) {
+                                            $author_id = get_post_field('post_author', $postChildId);
+                                            echo $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
+                                        }
+                                        ?>
+                                    </p>
+
                                     <?php
-                                    $customer_id = $order->get_customer_id();
-                                    if ($customer_id) {
-                                        $user = get_user_by('id', $customer_id);
-                                        echo $user ? esc_html($user->display_name) : 'Guest';
-                                    } else {
-                                        echo 'Guest';
+                                    // Get the child post ID and display custom fields
+                                    
+                                    if ($postChildId) {
+                                        customFieldsOfPost($postChildId);
                                     }
                                     ?>
-                                </p>
-
-                                <button type="button" class="btn-dm" show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
-
-                                <div class="order-details" style="display: none;">
-                                    <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
-                                    <p>Status: <?php echo wc_get_order_status_name($order->get_status()); ?></p>
-                                    <p>Total: <?php echo $order->get_formatted_order_total(); ?></p>
-                                    <p>
-                                        <a class="link-dm" href="<?php echo esc_url($order->get_edit_order_url()); ?>">Edit</a>
-                                    </p>
                                 </div>
-                            </td>
-                            <td>
-                                <a href="<?php echo esc_url(get_permalink($product_id)); ?>" class="link-dm">
-                                    <?php echo esc_html($product_name); ?>
-                                </a>
-                            </td>
-                            <td><?php echo $child_name ? showChildUrl(cleanMetaValue($child_name), cleanMetaValue($child_id)) : 'N/A'; ?></td>
-                            <td><?php echo $child_id ? cleanMetaValue($child_id) : 'N/A'; ?></td>
-                        </tr>
-                    <?php endforeach;
+
+                            </div>
+                        </p>
+                    </td>
+                    <td class="group-td">
+                        <p>
+                            <button type="button" class="btn-dm show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+                            <div class="show-more-details" style="display: none;">
+                                <!-- Group checkboxes instead of select -->
+                                <div id="group-checkboxes">
+                                    <p><input type="checkbox" id="no-groups" value="no-groups"> No Groups</p>
+                                    <p><input type="checkbox" id="all-groups" value="all-groups"> All Groups</p>
+                                    <?php echo get_all_groups_checkboxes(); ?> <!-- Dynamically load more checkboxes here -->
+                                </div>
+
+                                <!-- Apply button -->
+                                <button type="button" class="btn-dm" name="manage-groups" onclick="updatePostGroups()">Apply</button>
+                            </div>     
+                        </p>
+                    </td>
+
+
+                </tr>
+                <?php endforeach;
                 endforeach; ?>
             </tbody>
         </table>
-    </div> 
+    </div>
     <?php
     // -------------------------
 // Define Main Function - End
@@ -206,74 +368,99 @@ function all_orders_with_products_shortcode()
     ?>
 
     <style>
-        #products-from-order .woocommerce-orders-tabs {
-            margin-bottom: 15px;
-        }
+    #products-from-order .woocommerce-orders-tabs {
+        margin-bottom: 15px;
+    }
 
-        #products-from-order .orders-tab {
-            padding: 10px 15px;
-            cursor: pointer;
-            border: none;
-            background: #ddd;
-            margin-right: 5px;
-        }
+    #products-from-order .orders-tab {
+        padding: 10px 15px;
+        cursor: pointer;
+        border: none;
+        background: #ddd;
+        margin-right: 5px;
+    }
 
-        .orders-tab.active {
-            background: #0073aa;
-            color: white;
-        }
+    .orders-tab.active {
+        background: #0073aa;
+        color: white;
+    }
 
-        #products-from-order .tab-content {
-            display: none;
-        }
+    #products-from-order .tab-content {
+        display: none;
+    }
 
-        #products-from-order.tab-content.active {
-            display: block;
-            background-color: #fff !important;
-        }
+    #products-from-order.tab-content.active {
+        display: block;
+        background-color: #fff !important;
+    }
 
-        .link-dm {
-            color: #0073aa !important;
-        }
+    .link-dm {
+        color: #0073aa !important;
+    }
 
-        #products-from-order .woocommerce-orders-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+    #products-from-order .woocommerce-orders-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
 
-        #products-from-order .woocommerce-orders-table th,
-        #products-from-order .woocommerce-orders-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
+    #products-from-order .woocommerce-orders-table th,
+    #products-from-order .woocommerce-orders-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
 
-        #products-from-order .woocommerce-orders-table th {
-            background-color: #f4f4f4;
-        }
+    #products-from-order .woocommerce-orders-table th {
+        background-color: #f4f4f4;
+    }
 
-        .btn-dm {
-            font-size: 16px;
-            padding: 4px 12px;
-            border: 1px solid #0073aa !important;
-            line-height: 18px;
-            border-radius: 6px;
-            background-color: #fff !important;
-            color: #0073aa !important;
-        }
-        .btn-dm:hover, .btn-dm:focus {
-            color: #fff !important;
-            background-color: #0073aa !important;
-        }
-        .woocommerce-orders-filters select, .woocommerce-orders-filters input {
-            font-size: 16px;
-            padding: 6px 12px;
-            border: 1px solid #333;
-            line-height: 18px;
-            border-radius: 6px;
-            background-color: #fff;
-            color: #333;
-        }
+    .btn-dm {
+        font-size: 14px;
+        font-weight: 500;
+        padding: 4px 12px;
+        border: 1px solid #0073aa !important;
+        line-height: 18px;
+        border-radius: 6px;
+        background-color: #fff !important;
+        color: #0073aa !important;
+    }
+
+    .btn-dm:hover,
+    .btn-dm:focus {
+        color: #fff !important;
+        background-color: #0073aa !important;
+    }
+
+    .woocommerce-orders-filters select,
+    .woocommerce-orders-filters input {
+        font-size: 16px;
+        padding: 6px 12px;
+        border: 1px solid #333;
+        line-height: 18px;
+        border-radius: 6px;
+        background-color: #fff;
+        color: #333;
+    }
+    #products-from-orders tr {
+        position: relative;
+    }
+    #products-from-orders .kid-details {
+        position: absolute;
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 25px 25px;
+        width: 100%;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: row;
+        gap: 26px;
+        flex-wrap: wrap;
+        z-index: 80;
+    }
+    #products-from-orders .acf-fields .field-label {
+        font-weight: 500;
+    }
     </style>
 
     <?php
@@ -287,9 +474,10 @@ function all_orders_with_products_shortcode()
 // -------------------------
     ?>
 
-    <script>
-        function toggleOrderDetails(button) {
-            var details = button.nextElementSibling;
+<script>
+    function toggleOrderDetails(button) {
+        var details = button.closest("td").querySelector(".show-more-details");
+        if (details) {
             if (details.style.display === "none") {
                 details.style.display = "block";
                 button.textContent = "Show less";
@@ -298,7 +486,9 @@ function all_orders_with_products_shortcode()
                 button.textContent = "Show more";
             }
         }
-    </script>
+    }
+
+</script>
 
     <?php
     // -------------------------
