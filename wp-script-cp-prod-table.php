@@ -123,7 +123,7 @@ function all_orders_with_products_shortcode()
         <label>Age: <input type="number" id="age-filter" placeholder="Enter Age"></label>
         <label>From Date: <input type="text" id="date-filter"
                 value="<?php echo date('d-m-Y', strtotime('-7 days')); ?>"></label>
-        <button onclick="applyFilters()">Filter</button>
+        <button class="btn-dm" onclick="applyFilters()">Filter</button>
     </div>
 
     <div id="products-from-orders" class="tab-content active">
@@ -170,7 +170,7 @@ function all_orders_with_products_shortcode()
                                     ?>
                                 </p>
 
-                                <button type="button" class="show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+                                <button type="button" class="class="btn-dm" show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
 
                                 <div class="order-details" style="display: none;">
                                     <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
@@ -248,7 +248,7 @@ function all_orders_with_products_shortcode()
             background-color: #f4f4f4;
         }
 
-        #products-from-order button {
+        .btn-dm {
             font-size: 16px;
             padding: 4px 12px;
             border: 1px solid #0073aa;
@@ -257,14 +257,14 @@ function all_orders_with_products_shortcode()
             background-color: #fff;
             color: #0073aa;
         }
-        #products-from-order button:hover {
+        .btn-dm :hover {
             color: #fff;
             background-color: #0073aa;
         }
         .woocommerce-orders-filters select, .woocommerce-orders-filters input {
             font-size: 16px;
             padding: 6px 12px;
-            border: 1px solid #0073aa;
+            border: 1px solid #333;
             line-height: 18px;
             border-radius: 6px;
             background-color: #fff;
