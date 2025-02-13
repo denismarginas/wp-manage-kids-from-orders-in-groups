@@ -170,7 +170,7 @@ function all_orders_with_products_shortcode()
                                     ?>
                                 </p>
 
-                                <button type="button" class="class="btn-dm" show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
+                                <button type="button" class="btn-dm" show-more-btn" onclick="toggleOrderDetails(this)">Show more</button>
 
                                 <div class="order-details" style="display: none;">
                                     <p>Date: <?php echo $order->get_date_created()->date('Y-m-d'); ?></p>
