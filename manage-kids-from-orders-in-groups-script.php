@@ -60,7 +60,16 @@ function get_all_products($product_id_param = null)
 
     return $product_options;
 }
+function render_buttons_for_requests() {
+    $page_id_1 = '6633';
+    $page_id_2 = '6633';
+    $html_btn_1 = '<a href="'.get_permalink($page_id_2) .'" class="btn-primary-dm btn-requests-dm">הוסף בקשה</a>';
+    $html_btn_2 = '<a href="'.get_permalink($page_id_1) .'" class="btn-primary-dm btn-requests-dm">הצג את כל הבקשות</a>';
 
+    $html_section = $html_btn_1.$html_btn_2;
+
+    return $html_section;
+}
 
 function get_all_groups_options($group_value_selected = null)
 {
@@ -490,6 +499,13 @@ function custom_code_css_js_manage_kids_in_groups()
         .link-dm {
             color: #0073aa !important;
         }
+        .link-dm.view-order {
+            font-weight: 600;
+            text-decoration: underline;
+            padding: 3px 8px;
+            background-color: rgba(164, 245, 250, 0.62);
+            border-radius: 8px;
+        }
 
         #products-from-order .woocommerce-orders-table {
             width: 100%;
@@ -508,7 +524,7 @@ function custom_code_css_js_manage_kids_in_groups()
         }
 
         .dm-title-section {
-            background-color: #0073aa;
+            background-color: #00bcf1;
             width: 100%;
             padding: 12px 25px;
             text-align: center;
@@ -554,6 +570,9 @@ function custom_code_css_js_manage_kids_in_groups()
             background-color: #fff !important;
             color: #0073aa !important;
         }
+        .btn-filters-dm {
+            background-color:rgb(199, 232, 247) !important;
+        }
 
         .btn-primary-dm:hover,
         .btn-primary-dm:focus {
@@ -564,6 +583,16 @@ function custom_code_css_js_manage_kids_in_groups()
         .btn-dm[name="manage-groups"] {
             width: 100%;
             padding: 8px 14px;
+        }
+        .btn-requests-dm {
+            color: rgb(255, 255, 255) !important;
+            background-color:rgb(136, 59, 76) !important;
+            border: 1px solid rgb(216, 66, 11) !important;
+        }
+        .btn-requests-dm:hover,
+        .btn-requests-dm:focus {
+            color: #fff !important;
+            background-color: rgb(216, 66, 11) !important;
         }
 
         .woocommerce-orders-filters {
@@ -795,9 +824,20 @@ function custom_code_css_js_manage_kids_in_groups()
             if (ageFromFilter) {
                 filters.push("age_from=" + encodeURIComponent(ageFromFilter));
             }
+
             let ageToFilter = document.getElementById("age-to-filter").value;
             if (ageToFilter) {
                 filters.push("age_to=" + encodeURIComponent(ageToFilter));
+            }
+
+            let kidIdFilter = document.getElementById("kid-id-filter").value;
+            if (kidIdFilter) {
+                filters.push("kid_id=" + encodeURIComponent(kidIdFilter));
+            }
+
+            let kidNameFilter = document.getElementById("kid-name-filter").value;
+            if (kidNameFilter) {
+                filters.push("kid_name=" + encodeURIComponent(kidNameFilter));
             }
 
             let dateFilter = document.getElementById("date-filter").value;
@@ -939,6 +979,8 @@ function manage_kids_in_groups()
     }
     $age_from_param = isset($_GET['age_from']) ? $_GET['age_from'] : null;
     $age_to_param = isset($_GET['age_to']) ? $_GET['age_to'] : null;
+    $kid_name_param = isset($_GET['kid_name']) ? $_GET['kid_name'] : null;
+    $kid_id_param = isset($_GET['kid_id']) ? $_GET['kid_id'] : null;
     $group_param = isset($_GET['group_id']) ? $_GET['group_id'] : null;
     $product_param = isset($_GET['product_id']) ? $_GET['product_id'] : null;
 
@@ -986,24 +1028,32 @@ function manage_kids_in_groups()
     </div>
     <div id="dm-filters" class="woocommerce-orders-filters">
         <div class="filters dm-flex">
-            <label class="dm-label"><span> מוּצָר:</span>
+            <label class="dm-label"><span> מוּצָר</span>
                 <select id="product-filter" name="product">
                     <?php echo get_all_products($product_param); ?>
                 </select>
             </label>
-            <label class="dm-label"><span>קְבוּצָה:</span>
+            <label class="dm-label"><span>קְבוּצָה</span>
                 <select id="group-filter" name="group">
                     <?php echo get_all_groups_options($group_param); ?>
                 </select>
             </label>
             <label class="dm-label">
-                <span>מגיל:</span>
+                <span>מגיל</span>
                 <input type="number" id="age-from-filter" name="age_from" placeholder="5"
                     value="<?php echo $age_from_param; ?>">
             </label>
             <label class="dm-label">
-                <span>מגיל:</span>
+                <span>מגיל</span>
                 <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
+            </label>
+            <label class="dm-label">
+                <span>מזהה ילד</span>
+                <input type="number" id="kid-id-filter" name="kid_id" placeholder="123456789" value="<?php echo $kid_id_param; ?>">
+            </label>
+            <label class="dm-label">
+                <span> שם ילד</span>
+                <input type="text" id="kid-name-filter" name="kid_name" placeholder="John Smith" value="<?php echo $kid_name_param; ?>">
             </label>
             <label class="dm-label"><span>מתאריך</span><input type="text" id="date-filter" name="date"
                     placeholder="10-02-2025" value="<?php echo $date_param; ?>">
@@ -1011,27 +1061,28 @@ function manage_kids_in_groups()
         </div>
         <p>
             <button type="button" class="btn-dm show-more-btn" onclick="toggleThis(this)">+</button>
-        <div class="show-more-details" style="display: none;">
-            <p>
-                <label class="dm-label"><span>הפעל מסננים מתקדמים:</span></label>
-            <p>
-                <input type="checkbox" value="include-advance-filters" class="include-advance-filters">
-                <span>כלול מסננים מתקדמים</span>
-            </p>
-            </p>
-            <p class="advance-filters dm-flex">
-                <label class="dm-label"> <span>אל תכלול שדות מוצר:</span><input type="text" name="exclude_product_fields"
-                        id="exclude_product_fields" name="exclude_product_fields"
-                        value="<?php echo implode(',', array_values($excluded_keys)); ?>">
-                </label>
-                <label class="dm-label"> <span>כלול רק טקסונומיות של מוצרים:</span><input type="text"
-                        name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
-                        value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
-                </label>
-            </p>
-        </div>
+            <div class="show-more-details" style="display: none;">
+                <div>
+                    <label class="dm-label"><span>הפעל מסננים מתקדמים</span></label>
+                    <input type="checkbox" value="include-advance-filters" class="include-advance-filters">
+                    <span>כלול מסננים מתקדמים</span>
+                </div>
+                <div class="advance-filters dm-flex">
+                    <label class="dm-label"> <span>אל תכלול שדות מוצר</span><input type="text" name="exclude_product_fields"
+                            id="exclude_product_fields" name="exclude_product_fields"
+                            value="<?php echo implode(',', array_values($excluded_keys)); ?>">
+                    </label>
+                    <label class="dm-label"> <span>כלול רק טקסונומיות של מוצרים</span><input type="text"
+                            name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
+                            value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
+                    </label>
+                </div>
+            </div>
         </p>
-        <button class="btn-primary-dm" onclick="applyFilters()">החל מסננים</button>
+        <div class="dm-flex">
+            <button class="btn-primary-dm btn-filters-dm" onclick="applyFilters()">החל מסננים &#128269</button>
+            <?php echo render_buttons_for_requests(); ?>
+        </div>
     </div>
 
     <div id="products-from-orders" class="dm-table tab-content active"
@@ -1099,13 +1150,21 @@ function manage_kids_in_groups()
                             if (is_numeric($child_age) && is_numeric($age_from_param) && ((int) $child_age < (int) $age_from_param)) {
                                 continue;
                             }
+
                             if (is_numeric($child_age) && is_numeric($age_to_param) && ((int) $child_age > (int) $age_to_param)) {
                                 continue;
                             }
-                            if (!empty($product_param)) {
-                                if ($product_param != $product_id) {
-                                    continue;
-                                }
+
+                            if (!empty($kid_id_param) && $kid_id_param != $child_id) {
+                                continue;
+                            }
+                            
+                            if (!empty($kid_name_param) && preg_replace('/\s+/', '', $kid_name_param) != preg_replace('/\s+/', '', $child_name)) {
+                                continue;
+                            }                            
+                            
+                            if (!empty($product_param) && $product_param != $product_id) {
+                                continue;
                             }
 
                             if (!empty($group_param)) {
@@ -1144,7 +1203,7 @@ function manage_kids_in_groups()
                                     <span>
                                         <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
                                         <div class="show-more-details" style="display: none;">
-
+                                            <div class="popup-style child-details-box">
                                             <?php
                                             $order_details = '
                                             <p> לקוח: ';
@@ -1164,6 +1223,7 @@ function manage_kids_in_groups()
                                             </p>';
                                             echo $order_details;
                                             ?>
+                                            </div>
                                         </div>
                                     </span>
                                 </td>
@@ -1235,23 +1295,22 @@ function manage_kids_in_groups()
                                                         order_id="<?php echo esc_attr($order_id); ?>"
                                                         order_date="<?php echo esc_attr($order_date); ?>"
                                                         order_item_custom_field="<?php echo esc_attr($order_item_custom_field); ?>">
-                                                        Apply
+                                                        להחיל 
                                                     </button>
 
                                                     <!-- JSON Data Storage -->
-                                                    <script type="application/json"
-                                                        id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                                        <?php echo json_encode([
-                                                                            'kid_id' => $child_id,
-                                                                            'kid_name' => $child_name,
-                                                                            'kid_details' => $child_details,
-                                                                            'order_id' => $order_id,
-                                                                            'order_date' => $order_date,
-                                                                            'order_details' => $order_details,
-                                                                            'product_details' => $product_details,
-                                                                            'product_field' => $order_item_custom_field
-                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                                    </script>
+                                                    <script type="application/json" id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
+                                                        <?php echo json_encode([
+                                                            'kid_id' => $child_id,
+                                                            'kid_name' => $child_name,
+                                                            'kid_details' => $child_details,
+                                                            'order_id' => $order_id,
+                                                            'order_date' => $order_date,
+                                                            'order_details' => $order_details,
+                                                            'product_details' => $product_details,
+                                                            'product_field' => $order_item_custom_field
+                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                    </script>
                                                 </div>
                                             </div>
                                         </div>
