@@ -39,6 +39,30 @@ function showChildUrl($child_name, $child_id)
     return esc_html($child_name);
 }
 
+function getChildUrl($child_id)
+{
+    if (empty($child_id)) {
+        return '';
+    }
+
+    $args = array(
+        'post_type' => 'kids',
+        'meta_key' => 'kid_id',
+        'meta_value' => $child_id,
+        'posts_per_page' => 1,
+        'post_status' => 'publish',
+    );
+
+    $query = new WP_Query($args);
+
+    if ($query->have_posts()) {
+        $post = $query->posts[0];
+        return get_permalink($post->ID);
+    }
+
+    return '';
+}
+
 function get_all_products($product_id_param = null)
 {
     $products = wc_get_products(array('limit' => -1));
@@ -60,13 +84,14 @@ function get_all_products($product_id_param = null)
 
     return $product_options;
 }
-function render_buttons_for_requests() {
+function render_buttons_for_requests()
+{
     $page_id_1 = '6633';
     $page_id_2 = '6633';
-    $html_btn_1 = '<a href="'.get_permalink($page_id_2) .'" class="btn-primary-dm btn-requests-dm">הוסף בקשה</a>';
-    $html_btn_2 = '<a href="'.get_permalink($page_id_1) .'" class="btn-primary-dm btn-requests-dm">הצג את כל הבקשות</a>';
+    $html_btn_1 = '<a href="' . get_permalink($page_id_2) . '" class="btn-primary-dm btn-requests-dm">הוסף בקשה</a>';
+    $html_btn_2 = '<a href="' . get_permalink($page_id_1) . '" class="btn-primary-dm btn-requests-dm">הצג את כל הבקשות</a>';
 
-    $html_section = $html_btn_1.$html_btn_2;
+    $html_section = $html_btn_1 . $html_btn_2;
 
     return $html_section;
 }
@@ -354,7 +379,7 @@ function camp_group_kid_list()
     }
     if (!is_singular('camp-group')) {
         return '';
-        echo "<p>Incorect Type post</p>";
+        echo "<p>Incorrect Type post</p>";
     }
 
     global $post;
@@ -369,12 +394,18 @@ function camp_group_kid_list()
     ob_start();
     ?>
     <table id="kids-from-groups" class="dm-table" border="1"
-        name="tabel_products-from-orders<?php echo "-" . date('Y-m-d'); ?>">
+        name="table_products-from_orders<?php echo "-" . date('Y-m-d'); ?>">
         <thead>
             <tr>
-                <?php foreach ($headers as $header): ?>
-                    <th><?php echo ucwords(str_replace('_', ' ', $header)); ?></th>
-                <?php endforeach; ?>
+                <?php
+                foreach ($headers as $header) {
+                    $field_object = get_field_object($header, $post->ID);
+                    $label = $field_object ? $field_object['label'] : ucwords(str_replace('_', ' ', $header));
+                    ?>
+                    <th>
+                        <?php echo $label; ?>
+                    </th>
+                <?php } ?>
             </tr>
         </thead>
         <tbody>
@@ -499,10 +530,11 @@ function custom_code_css_js_manage_kids_in_groups()
         .link-dm {
             color: #0073aa !important;
         }
+
         .link-dm.view-order {
             font-weight: 600;
             text-decoration: underline;
-            padding: 3px 8px;
+            padding: 3px 8px 7px 8px;
             background-color: rgba(164, 245, 250, 0.62);
             border-radius: 8px;
         }
@@ -570,8 +602,9 @@ function custom_code_css_js_manage_kids_in_groups()
             background-color: #fff !important;
             color: #0073aa !important;
         }
+
         .btn-filters-dm {
-            background-color:rgb(199, 232, 247) !important;
+            background-color: rgb(199, 232, 247) !important;
         }
 
         .btn-primary-dm:hover,
@@ -584,15 +617,18 @@ function custom_code_css_js_manage_kids_in_groups()
             width: 100%;
             padding: 8px 14px;
         }
+
         .btn-requests-dm {
             color: rgb(255, 255, 255) !important;
-            background-color:rgb(136, 59, 76) !important;
-            border: 1px solid rgb(216, 66, 11) !important;
+            background-color: rgb(234, 171, 89) !important;
+            border: 1px solid rgb(234, 171, 89) !important;
         }
+
         .btn-requests-dm:hover,
         .btn-requests-dm:focus {
             color: #fff !important;
-            background-color: rgb(216, 66, 11) !important;
+            background-color: #ff9c1d !important;
+            border: 1px solid #ff9c1d !important;
         }
 
         .woocommerce-orders-filters {
@@ -645,6 +681,13 @@ function custom_code_css_js_manage_kids_in_groups()
             min-width: 260px;
         }
 
+        .dm-table .popup-style.order-details-box {
+            right: auto;
+            left: auto;
+            width: auto;
+            max-width: 240px;
+        }
+
         .dm-table tbody .field-label {
             font-weight: 600;
         }
@@ -674,6 +717,27 @@ function custom_code_css_js_manage_kids_in_groups()
             flex-direction: row;
             flex-wrap: wrap;
             gap: 24px;
+            align-items: end;
+        }
+
+        .dm-export-buttons #export_delimiter {
+            font-size: 14px;
+            line-height: 14px;
+            padding: 2px 12px;
+            width: 45px;
+            border-radius: 8px;
+        }
+
+        .dm-export-buttons .dm-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin-bottom: 0px !important;
+        }
+
+        .dm-export-buttons .dm-label span {
+            font-size: 12px;
+            line-height: 14px;
         }
     </style>
 
@@ -810,48 +874,48 @@ function custom_code_css_js_manage_kids_in_groups()
         function applyFilters() {
             let filters = [];
 
-            let productFilter = document.getElementById("product-filter").value;
+            let productFilter = document.getElementById("product-filter")?.value || "";
             if (productFilter !== "all") {
                 filters.push("product_id=" + encodeURIComponent(productFilter));
             }
 
-            let groupFilter = document.getElementById("group-filter").value;
+            let groupFilter = document.getElementById("group-filter")?.value || "";
             if (groupFilter !== "all-groups") {
                 filters.push("group_id=" + encodeURIComponent(groupFilter));
             }
 
-            let ageFromFilter = document.getElementById("age-from-filter").value;
+            let ageFromFilter = document.getElementById("age-from-filter")?.value || "";
             if (ageFromFilter) {
                 filters.push("age_from=" + encodeURIComponent(ageFromFilter));
             }
 
-            let ageToFilter = document.getElementById("age-to-filter").value;
+            let ageToFilter = document.getElementById("age-to-filter")?.value || "";
             if (ageToFilter) {
                 filters.push("age_to=" + encodeURIComponent(ageToFilter));
             }
 
-            let kidIdFilter = document.getElementById("kid-id-filter").value;
+            let kidIdFilter = document.getElementById("kid-id-filter")?.value || "";
             if (kidIdFilter) {
                 filters.push("kid_id=" + encodeURIComponent(kidIdFilter));
             }
 
-            let kidNameFilter = document.getElementById("kid-name-filter").value;
+            let kidNameFilter = document.getElementById("kid-name-filter")?.value || "";
             if (kidNameFilter) {
                 filters.push("kid_name=" + encodeURIComponent(kidNameFilter));
             }
 
-            let dateFilter = document.getElementById("date-filter").value;
+            let dateFilter = document.getElementById("date-filter")?.value || "";
             if (dateFilter) {
                 filters.push("date=" + encodeURIComponent(dateFilter));
             }
 
-            let includeAdvancedFilters = document.querySelector(".include-advance-filters").checked;
+            let includeAdvancedFilters = document.querySelector(".include-advance-filters")?.checked ?? false;
             if (includeAdvancedFilters) {
-                let excludeProductFields = document.getElementById("exclude_product_fields").value;
+                let excludeProductFields = document.getElementById("exclude_product_fields")?.value || "";
                 if (excludeProductFields) {
                     filters.push("exclude_product_fields=" + encodeURIComponent(excludeProductFields));
                 }
-                let includeOnlyProdTax = document.getElementById("include_only_prod_tax").value;
+                let includeOnlyProdTax = document.getElementById("include_only_prod_tax")?.value || "";
                 if (includeOnlyProdTax) {
                     filters.push("include_only_prod_tax=" + encodeURIComponent(includeOnlyProdTax));
                 }
@@ -860,6 +924,10 @@ function custom_code_css_js_manage_kids_in_groups()
             let queryString = filters.join("&");
             let currentUrl = window.location.href.split('?')[0];
             window.location.href = currentUrl + "?" + queryString;
+        }
+
+        function resetFilters() {
+            window.location.href = window.location.pathname;
         }
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -882,15 +950,30 @@ function custom_code_css_js_manage_kids_in_groups()
             document.querySelectorAll(".dm-table").forEach((table) => {
                 let tableName = table.getAttribute("name") || "table";
 
-                const div = document.createElement("div");
-                div.className = "dm-export-buttons export-buttons-container";
+                const container = document.createElement("div");
+                container.className = "dm-export-buttons export-buttons-container";
+
+                const delimiterLabel = document.createElement("label");
+                delimiterLabel.className = "dm-label";
+                delimiterLabel.innerHTML = `<span>תוחם</span>`;
+
+                const delimiterInput = document.createElement("input");
+                delimiterInput.type = "text";
+                delimiterInput.id = "export_delimiter";
+                delimiterInput.name = "export_delimiter";
+                delimiterInput.placeholder = ";/,";
+                delimiterInput.value = ",";
+
+                delimiterLabel.appendChild(delimiterInput);
+                container.appendChild(delimiterLabel);
 
                 const advancedButton = document.createElement("button");
                 advancedButton.className = "btn-primary-dm";
                 advancedButton.innerHTML = "&#8603; טבלת ייצוא מתקדמת";
                 advancedButton.setAttribute("export_type", "advance");
                 advancedButton.onclick = function () {
-                    downloadTableCSV(table, `${tableName}_advanced.csv`);
+                    const delimiter = delimiterInput.value || ",";
+                    downloadTableCSV(table, `${tableName}_advanced.csv`, delimiter);
                 };
 
                 const simpleButton = document.createElement("button");
@@ -898,41 +981,75 @@ function custom_code_css_js_manage_kids_in_groups()
                 simpleButton.innerHTML = "&#8594; טבלת ייצוא פשוטה";
                 simpleButton.setAttribute("export_type", "simple");
                 simpleButton.onclick = function () {
-                    downloadTableCSV(table, `${tableName}_simple.csv`);
+                    const delimiter = delimiterInput.value || ",";
+                    downloadTableCSV(table, `${tableName}_simple.csv`, delimiter);
                 };
 
-                div.appendChild(advancedButton);
-                div.appendChild(simpleButton);
+                container.appendChild(advancedButton);
+                container.appendChild(simpleButton);
 
-                table.insertAdjacentElement("afterend", div);
+                table.insertAdjacentElement("afterend", container);
             });
         });
 
-
-        function downloadTableCSV(table, filename) {
+        function downloadTableCSV(table, filename, delimiter) {
+            delimiter = delimiter || ",";
             let csv = [];
-            table.querySelectorAll("tr").forEach(row => {
+            let headers = [];
+            let rows = [];
+            let isSimpleExport = filename.includes("_simple");
+
+            table.querySelectorAll("tr").forEach((row, rowIndex) => {
                 let rowData = [];
-                row.querySelectorAll("th, td").forEach(cell => {
+                let extraFields = {};
+
+                row.querySelectorAll("th, td").forEach((cell) => {
                     let text = cell.cloneNode(true);
                     text.querySelectorAll("button, script, .group-box, .view-order").forEach(el => el.remove());
 
-                    if (filename.includes("_simple")) {
+                    if (isSimpleExport) {
                         text.querySelectorAll(".show-more-details, .popup-style, .child-details-box").forEach(el => el.remove());
                     }
 
                     let extraDetails = [];
                     text.querySelectorAll(".show-more-details p").forEach(p => {
-                        extraDetails.push(p.innerText.trim());
+                        let labelEl = p.querySelector(".field-label");
+                        let valueEl = p.querySelector(".field-value");
+
+                        if (!isSimpleExport && labelEl && valueEl) {
+                            let label = labelEl.innerText.trim();
+                            let value = valueEl.innerText.trim();
+                            extraFields[label] = value;
+                            if (!headers.includes(label)) {
+                                headers.push(label);
+                            }
+                            p.remove();
+                        } else {
+                            extraDetails.push(p.innerText.trim());
+                        }
                     });
+
                     let finalText = text.innerText.trim();
                     if (extraDetails.length > 0) {
                         finalText += "\n" + extraDetails.join("\n");
                     }
+
                     finalText = finalText.replace(/"/g, '""');
                     rowData.push(`"${finalText}"`);
                 });
-                csv.push(rowData.join(","));
+
+                rows.push({ rowData, extraFields });
+            });
+
+            let headerRow = [...(rows[0]?.rowData || [])];
+            if (!isSimpleExport) {
+                headerRow.push(...headers);
+            }
+            csv.push(headerRow.join(delimiter));
+
+            rows.forEach(({ rowData, extraFields }) => {
+                let extraValues = isSimpleExport ? [] : headers.map(label => `"${extraFields[label] || ""}"`);
+                csv.push([...rowData, ...extraValues].join(delimiter));
             });
 
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csv.join("\n");
@@ -944,6 +1061,7 @@ function custom_code_css_js_manage_kids_in_groups()
             link.click();
             document.body.removeChild(link);
         }
+
 
 
     </script>
@@ -1028,12 +1146,12 @@ function manage_kids_in_groups()
     </div>
     <div id="dm-filters" class="woocommerce-orders-filters">
         <div class="filters dm-flex">
-            <label class="dm-label"><span> מוּצָר</span>
+            <label class="dm-label"><span> מוצר </span>
                 <select id="product-filter" name="product">
                     <?php echo get_all_products($product_param); ?>
                 </select>
             </label>
-            <label class="dm-label"><span>קְבוּצָה</span>
+            <label class="dm-label"><span>קבוצה</span>
                 <select id="group-filter" name="group">
                     <?php echo get_all_groups_options($group_param); ?>
                 </select>
@@ -1048,12 +1166,14 @@ function manage_kids_in_groups()
                 <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
             </label>
             <label class="dm-label">
-                <span>מזהה ילד</span>
-                <input type="number" id="kid-id-filter" name="kid_id" placeholder="123456789" value="<?php echo $kid_id_param; ?>">
+                <span>ת.ז ילד</span>
+                <input type="number" id="kid-id-filter" name="kid_id" placeholder="123456789"
+                    value="<?php echo $kid_id_param; ?>">
             </label>
             <label class="dm-label">
                 <span> שם ילד</span>
-                <input type="text" id="kid-name-filter" name="kid_name" placeholder="John Smith" value="<?php echo $kid_name_param; ?>">
+                <input type="text" id="kid-name-filter" name="kid_name" placeholder="John Smith"
+                    value="<?php echo $kid_name_param; ?>">
             </label>
             <label class="dm-label"><span>מתאריך</span><input type="text" id="date-filter" name="date"
                     placeholder="10-02-2025" value="<?php echo $date_param; ?>">
@@ -1061,26 +1181,27 @@ function manage_kids_in_groups()
         </div>
         <p>
             <button type="button" class="btn-dm show-more-btn" onclick="toggleThis(this)">+</button>
-            <div class="show-more-details" style="display: none;">
-                <div>
-                    <label class="dm-label"><span>הפעל מסננים מתקדמים</span></label>
-                    <input type="checkbox" value="include-advance-filters" class="include-advance-filters">
-                    <span>כלול מסננים מתקדמים</span>
-                </div>
-                <div class="advance-filters dm-flex">
-                    <label class="dm-label"> <span>אל תכלול שדות מוצר</span><input type="text" name="exclude_product_fields"
-                            id="exclude_product_fields" name="exclude_product_fields"
-                            value="<?php echo implode(',', array_values($excluded_keys)); ?>">
-                    </label>
-                    <label class="dm-label"> <span>כלול רק טקסונומיות של מוצרים</span><input type="text"
-                            name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
-                            value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
-                    </label>
-                </div>
+        <div class="show-more-details" style="display: none;">
+            <div>
+                <label class="dm-label"><span>הפעל מסננים מתקדמים</span></label>
+                <input type="checkbox" value="include-advance-filters" class="include-advance-filters">
+                <span>כלול מסננים מתקדמים</span>
             </div>
+            <div class="advance-filters dm-flex">
+                <label class="dm-label"> <span>אל תכלול שדות מוצר</span><input type="text" name="exclude_product_fields"
+                        id="exclude_product_fields" name="exclude_product_fields"
+                        value="<?php echo implode(',', array_values($excluded_keys)); ?>">
+                </label>
+                <label class="dm-label"> <span>כלול רק טקסונומיות של מוצרים</span><input type="text"
+                        name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
+                        value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
+                </label>
+            </div>
+        </div>
         </p>
         <div class="dm-flex">
             <button class="btn-primary-dm btn-filters-dm" onclick="applyFilters()">החל מסננים &#128269</button>
+            <button class="btn-primary-dm" onclick="resetFilters()">לאפס מסננים</button>
             <?php echo render_buttons_for_requests(); ?>
         </div>
     </div>
@@ -1133,9 +1254,9 @@ function manage_kids_in_groups()
 
                         $child_name = isset($child_name) ? cleanMetaValue($child_name) : null;
                         $child_id = isset($child_id) ? cleanMetaValue($child_id) : null;
-                        $postChildId = getChildPostId(cleanMetaValue($child_id));
+                        $post_child_url = getChildPostId(cleanMetaValue($child_id));
                         $child_url = ($child_name && $child_id) ? showChildUrl($child_name, $child_id) : null;
-                        $child_age = getCustomField($postChildId, "age");
+                        $child_age = getCustomField($post_child_url, "age");
 
                         $order_id = $order->get_id() ?? null;
                         $order_item_custom_fields = getCustomFieldsFromProductOrder($item);
@@ -1158,11 +1279,11 @@ function manage_kids_in_groups()
                             if (!empty($kid_id_param) && $kid_id_param != $child_id) {
                                 continue;
                             }
-                            
-                            if (!empty($kid_name_param) && preg_replace('/\s+/', '', $kid_name_param) != preg_replace('/\s+/', '', $child_name)) {
+
+                            if (!empty($kid_name_param) && strpos(preg_replace('/\s+/', '', $child_name), preg_replace('/\s+/', '', $kid_name_param)) === false) {
                                 continue;
-                            }                            
-                            
+                            }
+
                             if (!empty($product_param) && $product_param != $product_id) {
                                 continue;
                             }
@@ -1203,26 +1324,28 @@ function manage_kids_in_groups()
                                     <span>
                                         <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
                                         <div class="show-more-details" style="display: none;">
-                                            <div class="popup-style child-details-box">
-                                            <?php
-                                            $order_details = '
-                                            <p> לקוח: ';
+                                            <div class="popup-style order-details-box">
+                                                <?php
+                                                $order_details = '<p><span class="field-label"> לקוח: </span>';
+                                                $order_details .= '<span class="field-value">';
+                                                $customer_id = $order->get_customer_id();
+                                                if ($customer_id) {
+                                                    $user = get_user_by('id', $customer_id);
+                                                    $order_details .= $user ? esc_html($user->display_name) : 'Guest';
+                                                } else {
+                                                    $order_details .= 'Guest';
+                                                }
+                                                $order_details .= '</span>';
+                                                $order_details .= '</p>
 
-                                            $customer_id = $order->get_customer_id();
-                                            if ($customer_id) {
-                                                $user = get_user_by('id', $customer_id);
-                                                $order_details .= $user ? esc_html($user->display_name) : 'Guest';
-                                            } else {
-                                                $order_details .= 'Guest';
-                                            }
-
-                                            $order_details .= '</p>
-                                            <p>סטטוס:' . wc_get_order_status_name($order->get_status()) . '</p>
+                                            <p><span class="field-label">סטטוס:</span><span class="field-value">' . wc_get_order_status_name($order->get_status()) . '</span></p>
                                             <p>
+                                                <span class="field-label" style="display:none;"> קישור להזמנה: </span>
+                                                <span class="field-value" style="display:none;">' . esc_url($order->get_edit_order_url()) . '</span>
                                                 <a class="link-dm view-order" href="' . esc_url($order->get_edit_order_url()) . '">צפייה בהזמנה</a>
                                             </p>';
-                                            echo $order_details;
-                                            ?>
+                                                echo $order_details;
+                                                ?>
                                             </div>
                                         </div>
                                     </span>
@@ -1251,18 +1374,20 @@ function manage_kids_in_groups()
 
                                         <div class="show-more-details" style="display: none;"><div class="popup-style child-details-box">
                                     ';
-                                    $child_details .= '<p>ת.ז. הילד: ' . ($postChildId ? esc_html($postChildId) : 'N/A') . '</p>';
+                                    $child_details .= '<p><span class="field-label">ת.ז. הילד: </span><span class="field-value">' . ($post_child_url ? esc_html($post_child_url) : 'N/A') . '</span></p>';
 
-                                    if ($postChildId) {
-                                        $author_id = get_post_field('post_author', $postChildId);
+                                    if ($post_child_url) {
+                                        $author_id = get_post_field('post_author', $post_child_url);
                                         $author_name = $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
-                                        $child_details .= '<p>לקוח: ' . $author_name . '</p>';
+                                        $child_details .= '<p><span class="field-label">לקוח: </span><span class="field-value">' . $author_name . '</span></p>';
                                         ob_start();
-                                        customFieldsOfPost($postChildId);
+                                        customFieldsOfPost($post_child_url);
                                         $child_details .= ob_get_clean();
                                     }
-
-                                    $child_details .= $child_url;
+                                    $child_details .= '<p>
+                                        <span class="field-label" style="display:none;">קישור ילד:  </span>
+                                        <span class="field-value" style="display:none;">' . getChildUrl($child_id) . '</span>
+                                        </p>';
                                     $child_details .= '
                                             </div>
                                         </div>
@@ -1295,22 +1420,23 @@ function manage_kids_in_groups()
                                                         order_id="<?php echo esc_attr($order_id); ?>"
                                                         order_date="<?php echo esc_attr($order_date); ?>"
                                                         order_item_custom_field="<?php echo esc_attr($order_item_custom_field); ?>">
-                                                        להחיל 
+                                                        להחיל
                                                     </button>
 
                                                     <!-- JSON Data Storage -->
-                                                    <script type="application/json" id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                        <?php echo json_encode([
-                                                            'kid_id' => $child_id,
-                                                            'kid_name' => $child_name,
-                                                            'kid_details' => $child_details,
-                                                            'order_id' => $order_id,
-                                                            'order_date' => $order_date,
-                                                            'order_details' => $order_details,
-                                                            'product_details' => $product_details,
-                                                            'product_field' => $order_item_custom_field
-                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                    </script>
+                                                    <script type="application/json"
+                                                        id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
+                                                                                        <?php echo json_encode([
+                                                                                            'kid_id' => $child_id,
+                                                                                            'kid_name' => $child_name,
+                                                                                            'kid_details' => $child_details,
+                                                                                            'order_id' => $order_id,
+                                                                                            'order_date' => $order_date,
+                                                                                            'order_details' => $order_details,
+                                                                                            'product_details' => $product_details,
+                                                                                            'product_field' => $order_item_custom_field
+                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                                                    </script>
                                                 </div>
                                             </div>
                                         </div>
