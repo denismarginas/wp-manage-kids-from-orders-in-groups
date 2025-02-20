@@ -5,6 +5,7 @@ function dm_camp_group_changes_table() {
     }
 
     $kid_id_param = isset($_GET['kid_id']) ? $_GET['kid_id'] : null;
+    $status_param = isset($_GET['status']) ? $_GET['status'] : null;
 
     $args = [
         'post_type'      => 'camp-group-changes',
@@ -27,6 +28,10 @@ function dm_camp_group_changes_table() {
             <label class="dm-label">
                     <span>ת.ז ילד</span>
                     <input type="number" id="kid-id-filter" name="kid_id" placeholder="123456789" value="<?php echo $kid_id_param; ?>">
+            </label>
+            <label class="dm-label">
+                    <span>סטָטוּס</span>
+                    <input type="text" id="status-filter" name="status" placeholder="To do" value="To do">
             </label>
         </div>
         <div class="dm-flex">
@@ -57,6 +62,10 @@ function dm_camp_group_changes_table() {
                 $status = get_post_meta($post_id, 'status', true);
 
                 if (!empty($kid_id_param) && $kid_id_param != $kid_id) {
+                    continue;
+                }
+                if (!empty($status_param) && $status_param != $status) {
+                    echo $status_param." != ".$status."<br>";
                     continue;
                 }
             ?>

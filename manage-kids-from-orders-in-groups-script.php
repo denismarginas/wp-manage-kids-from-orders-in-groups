@@ -874,12 +874,16 @@ function custom_code_css_js_manage_kids_in_groups()
         function applyFilters() {
             let filters = [];
 
-            let productFilter = document.getElementById("product-filter")?.value || "";
+            let productFilter = document.getElementById("product-filter")?.value || "all";
             if (productFilter !== "all") {
                 filters.push("product_id=" + encodeURIComponent(productFilter));
             }
+            let statusFilter = document.getElementById("status-filter")?.value || "all";
+            if (statusFilter !== "all") {
+                filters.push("status=" + encodeURIComponent(statusFilter));
+            }
 
-            let groupFilter = document.getElementById("group-filter")?.value || "";
+            let groupFilter = document.getElementById("group-filter")?.value || "all-groups";
             if (groupFilter !== "all-groups") {
                 filters.push("group_id=" + encodeURIComponent(groupFilter));
             }
@@ -1061,8 +1065,6 @@ function custom_code_css_js_manage_kids_in_groups()
             link.click();
             document.body.removeChild(link);
         }
-
-
 
     </script>
 
@@ -1426,17 +1428,17 @@ function manage_kids_in_groups()
                                                     <!-- JSON Data Storage -->
                                                     <script type="application/json"
                                                         id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                                                        <?php echo json_encode([
-                                                                                            'kid_id' => $child_id,
-                                                                                            'kid_name' => $child_name,
-                                                                                            'kid_details' => $child_details,
-                                                                                            'order_id' => $order_id,
-                                                                                            'order_date' => $order_date,
-                                                                                            'order_details' => $order_details,
-                                                                                            'product_details' => $product_details,
-                                                                                            'product_field' => $order_item_custom_field
-                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                                                    </script>
+                                                                                                        <?php echo json_encode([
+                                                                                                            'kid_id' => $child_id,
+                                                                                                            'kid_name' => $child_name,
+                                                                                                            'kid_details' => $child_details,
+                                                                                                            'order_id' => $order_id,
+                                                                                                            'order_date' => $order_date,
+                                                                                                            'order_details' => $order_details,
+                                                                                                            'product_details' => $product_details,
+                                                                                                            'product_field' => $order_item_custom_field
+                                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                                                                    </script>
                                                 </div>
                                             </div>
                                         </div>
