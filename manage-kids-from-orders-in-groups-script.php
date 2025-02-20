@@ -86,7 +86,7 @@ function get_all_products($product_id_param = null)
 }
 function render_buttons_for_requests()
 {
-    $page_id_1 = '6633';
+    $page_id_1 = '6650';
     $page_id_2 = '6633';
     $html_btn_1 = '<a href="' . get_permalink($page_id_2) . '" class="btn-primary-dm btn-requests-dm">הוסף בקשה</a>';
     $html_btn_2 = '<a href="' . get_permalink($page_id_1) . '" class="btn-primary-dm btn-requests-dm">הצג את כל הבקשות</a>';
@@ -1015,6 +1015,13 @@ function custom_code_css_js_manage_kids_in_groups()
                         text.querySelectorAll(".show-more-details, .popup-style, .child-details-box").forEach(el => el.remove());
                     }
 
+                    text.querySelectorAll("select").forEach(selectEl => {
+                        let selectedText = selectEl.options[selectEl.selectedIndex]?.text.trim() || "";
+                        let selectedDiv = document.createElement("div");
+                        selectedDiv.innerText = selectedText;
+                        selectEl.replaceWith(selectedDiv);
+                    });
+
                     let extraDetails = [];
                     text.querySelectorAll(".show-more-details p").forEach(p => {
                         let labelEl = p.querySelector(".field-label");
@@ -1022,14 +1029,15 @@ function custom_code_css_js_manage_kids_in_groups()
 
                         if (!isSimpleExport && labelEl && valueEl) {
                             let label = labelEl.innerText.trim();
-                            let value = valueEl.innerText.trim();
+                            value = valueEl.innerText.trim();
+
                             extraFields[label] = value;
                             if (!headers.includes(label)) {
                                 headers.push(label);
                             }
                             p.remove();
-                        } else {
-                            extraDetails.push(p.innerText.trim());
+                        } else if (!p.querySelector(".field-label") && !p.querySelector(".field-value")) {
+                            p.remove();
                         }
                     });
 
@@ -1039,22 +1047,27 @@ function custom_code_css_js_manage_kids_in_groups()
                     }
 
                     finalText = finalText.replace(/"/g, '""');
-                    rowData.push(`"${finalText}"`);
+                    rowData.push(finalText);
                 });
 
                 rows.push({ rowData, extraFields });
             });
 
-            let headerRow = [...(rows[0]?.rowData || [])];
-            if (!isSimpleExport) {
-                headerRow.push(...headers);
+            if (rows.length > 0) {
+                if (!isSimpleExport) {
+                    rows[0].rowData = [...rows[0].rowData, ...headers];
+                }
             }
-            csv.push(headerRow.join(delimiter));
+
+
+            console.log("Rows:", rows.map((r, i) => `Index ${i}: ${r.rowData.join(delimiter)}`));
 
             rows.forEach(({ rowData, extraFields }) => {
                 let extraValues = isSimpleExport ? [] : headers.map(label => `"${extraFields[label] || ""}"`);
                 csv.push([...rowData, ...extraValues].join(delimiter));
             });
+
+            console.log("Final CSV Output:\n", csv.join("\n"));
 
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csv.join("\n");
             let encodedUri = encodeURI(csvContent);
@@ -1438,7 +1451,7 @@ function manage_kids_in_groups()
                                                                                                             'product_details' => $product_details,
                                                                                                             'product_field' => $order_item_custom_field
                                                                                                         ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                                                                    </script>
+                                                    </script>
                                                 </div>
                                             </div>
                                         </div>

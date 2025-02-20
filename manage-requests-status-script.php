@@ -31,7 +31,15 @@ function dm_camp_group_changes_table() {
             </label>
             <label class="dm-label">
                     <span>סטָטוּס</span>
-                    <input type="text" id="status-filter" name="status" placeholder="To do" value="To do">
+                    <select class="status-select" id="status-filter" name="status">
+                    <?php
+                        $status_choices = get_field_object('status')['choices'] ?? ['To do', 'Done'];
+                                foreach ($status_choices as $key => $label) {
+                                    $selected = ($status_param === $key) ? 'selected' : '';
+                                    echo "<option value='" . esc_html($label) . "' $selected>" . esc_html($label) . "</option>";
+                                }
+                        ?>
+                    </select>
             </label>
         </div>
         <div class="dm-flex">
@@ -65,7 +73,6 @@ function dm_camp_group_changes_table() {
                     continue;
                 }
                 if (!empty($status_param) && $status_param != $status) {
-                    echo $status_param." != ".$status."<br>";
                     continue;
                 }
             ?>
