@@ -1336,34 +1336,36 @@ function manage_kids_in_groups()
                                 <td column="Order Details">
                                     <?php $order_date = $order->get_date_created()->date('Y-m-d') ?? null; ?>
                                     <span><?php echo $order_date; ?></span>
-                                    <span>
+                                    <?php
+                                    $order_details = '<span>
                                         <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
                                         <div class="show-more-details" style="display: none;">
                                             <div class="popup-style order-details-box">
-                                                <?php
-                                                $order_details = '<p><span class="field-label"> לקוח: </span>';
-                                                $order_details .= '<span class="field-value">';
-                                                $customer_id = $order->get_customer_id();
-                                                if ($customer_id) {
-                                                    $user = get_user_by('id', $customer_id);
-                                                    $order_details .= $user ? esc_html($user->display_name) : 'Guest';
-                                                } else {
-                                                    $order_details .= 'Guest';
-                                                }
-                                                $order_details .= '</span>';
-                                                $order_details .= '</p>
+                                                <p><span class="field-label"> לקוח: </span>
+                                                <span class="field-value">';
+                                    $customer_id = $order->get_customer_id();
+                                    if ($customer_id) {
+                                        $user = get_user_by('id', $customer_id);
+                                        $order_details .= $user ? esc_html($user->display_name) : 'Guest';
+                                    } else {
+                                        $order_details .= 'Guest';
+                                    }
+                                    $order_details .= '</span></p>
 
-                                            <p><span class="field-label">סטטוס:</span><span class="field-value">' . wc_get_order_status_name($order->get_status()) . '</span></p>
-                                            <p>
-                                                <span class="field-label" style="display:none;"> קישור להזמנה: </span>
-                                                <span class="field-value" style="display:none;">' . esc_url($order->get_edit_order_url()) . '</span>
-                                                <a class="link-dm view-order" href="' . esc_url($order->get_edit_order_url()) . '">צפייה בהזמנה</a>
-                                            </p>';
-                                                echo $order_details;
-                                                ?>
+                                    <p><span class="field-label">סטטוס:</span><span class="field-value">' . wc_get_order_status_name($order->get_status()) . '</span></p>
+
+                                    <p>
+                                        <span class="field-label" style="display:none;"> קישור להזמנה: </span>
+                                        <span class="field-value" style="display:none;">' . esc_url($order->get_edit_order_url()) . '</span>
+                                        <a class="link-dm view-order" href="' . esc_url($order->get_edit_order_url()) . '">צפייה בהזמנה</a>
+                                    </p>
                                             </div>
                                         </div>
-                                    </span>
+                                    </span>';
+
+                                    echo $order_details;
+                                    ?>
+
                                 </td>
                                 <td column="Product">
                                     <?php
@@ -1441,17 +1443,17 @@ function manage_kids_in_groups()
                                                     <!-- JSON Data Storage -->
                                                     <script type="application/json"
                                                         id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                                                                        <?php echo json_encode([
-                                                                                                            'kid_id' => $child_id,
-                                                                                                            'kid_name' => $child_name,
-                                                                                                            'kid_details' => $child_details,
-                                                                                                            'order_id' => $order_id,
-                                                                                                            'order_date' => $order_date,
-                                                                                                            'order_details' => $order_details,
-                                                                                                            'product_details' => $product_details,
-                                                                                                            'product_field' => $order_item_custom_field
-                                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                    </script>
+                                                                                                                        <?php echo json_encode([
+                                                                                                                            'kid_id' => $child_id,
+                                                                                                                            'kid_name' => $child_name,
+                                                                                                                            'kid_details' => $child_details,
+                                                                                                                            'order_id' => $order_id,
+                                                                                                                            'order_date' => $order_date,
+                                                                                                                            'order_details' => $order_details,
+                                                                                                                            'product_details' => $product_details,
+                                                                                                                            'product_field' => $order_item_custom_field
+                                                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                                    </script>
                                                 </div>
                                             </div>
                                         </div>
