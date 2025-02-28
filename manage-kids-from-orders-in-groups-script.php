@@ -115,6 +115,52 @@ function get_all_groups_options($group_value_selected = null)
 
     return $group_options;
 }
+function get_all_pruducts_fields($excluded_keys = [], $include_only_keys = [], $args = null)
+{
+    if (!$args) {
+        $args = ['limit' => -1];
+    }
+    $orders = wc_get_orders($args);
+
+    if (!$orders) {
+        return '<p>No orders found.</p>';
+    }
+
+    $product_fields = ['all'];
+    foreach ($orders as $order) {
+        foreach ($order->get_items() as $item_id => $item) {
+            $order_item_custom_fields = getCustomFieldsFromProductOrder($item);
+
+            foreach ($order_item_custom_fields as $order_item_custom_field => $key_item) {
+                if (in_array($order_item_custom_field, $excluded_keys)) {
+                    continue;
+                }
+                if (!in_array($order_item_custom_field, $include_only_keys)) {
+                    continue;
+                }
+
+                if (!in_array($order_item_custom_field, $product_fields)) {
+                    $product_fields[] = $order_item_custom_field;
+                }
+            }
+        }
+    }
+
+    return $product_fields;
+}
+
+function render_select_options($options = [], $default = null)
+{
+    $output = '';
+
+    foreach ($options as $value) {
+        $selected = ($default !== null && $default == $value) ? ' selected' : '';
+        $output .= '<option value="' . $value . '"' . $selected . '>' . $value . '</option>';
+    }
+
+    return $output;
+}
+
 
 function get_all_groups_checkboxes()
 {
@@ -233,6 +279,7 @@ function update_groups_for_kid_callback()
         $kid_id = $_POST['kid_id'];
         $kid_name = $_POST['kid_name'];
         $kid_details = $_POST['kid_details'];
+        $kid_school = $_POST['kid_school'];
         $order_id = $_POST['order_id'];
         $order_date = $_POST['order_date'];
         $order_details = $_POST['order_details'];
@@ -284,6 +331,7 @@ function update_groups_for_kid_callback()
                         'kid_name' => $kid_name,
                         'kid_id' => $kid_id,
                         'kid_details' => $kid_details,
+                        'kid_school' => $kid_school,
                         'order_id' => $order_id,
                         'order_date' => $order_date,
                         'order_details' => $order_details,
@@ -402,7 +450,7 @@ function camp_group_kid_list()
                     $field_object = get_field_object($header, $post->ID);
                     $label = $field_object ? $field_object['label'] : ucwords(str_replace('_', ' ', $header));
                     ?>
-                    <th>
+                    <th column_name="<?php echo $label; ?>">
                         <?php echo $label; ?>
                     </th>
                 <?php } ?>
@@ -411,12 +459,18 @@ function camp_group_kid_list()
         <tbody>
             <?php foreach ($kid_list as $kid): ?>
                 <tr>
-                    <?php foreach ($headers as $header): ?>
-                        <td><?php echo $kid[$header]; ?></td>
+                    <?php foreach ($headers as $header):
+                        $field_object = get_field_object($header, $post->ID);
+                        $label = $field_object ? $field_object['label'] : ucwords(str_replace('_', ' ', $header));
+                        ?>
+                        <td column_name="<?php echo $label; ?>">
+                            <?php echo $kid[$header]; ?>
+                        </td>
                     <?php endforeach; ?>
                 </tr>
             <?php endforeach; ?>
         </tbody>
+
     </table>
     <?php
     return ob_get_clean();
@@ -739,6 +793,15 @@ function custom_code_css_js_manage_kids_in_groups()
             font-size: 12px;
             line-height: 14px;
         }
+
+        .row_kid_id,
+        .tab_kid_id {
+            display: none;
+        }
+
+        [column_name="Kid Id"] {
+            display: none;
+        }
     </style>
 
     <?php
@@ -841,6 +904,7 @@ function custom_code_css_js_manage_kids_in_groups()
                 kid_id: kidData.kid_id,
                 kid_name: kidData.kid_name,
                 kid_details: kidData.kid_details,
+                kid_school: kidData.kid_school,
                 order_id: kidData.order_id,
                 order_date: kidData.order_date,
                 order_details: kidData.order_details,
@@ -878,6 +942,12 @@ function custom_code_css_js_manage_kids_in_groups()
             if (productFilter !== "all") {
                 filters.push("product_id=" + encodeURIComponent(productFilter));
             }
+
+            let productFieldFilter = document.getElementById("product-field-filter")?.value || "all";
+            if (productFieldFilter !== "all") {
+                filters.push("product_field=" + encodeURIComponent(productFieldFilter));
+            }
+
             let statusFilter = document.getElementById("status-filter")?.value || "all";
             if (statusFilter !== "all") {
                 filters.push("status=" + encodeURIComponent(statusFilter));
@@ -918,6 +988,10 @@ function custom_code_css_js_manage_kids_in_groups()
                 let excludeProductFields = document.getElementById("exclude_product_fields")?.value || "";
                 if (excludeProductFields) {
                     filters.push("exclude_product_fields=" + encodeURIComponent(excludeProductFields));
+                }
+                let includeOnlyProductFields = document.getElementById("include_only_product_fields")?.value || "";
+                if (includeOnlyProductFields) {
+                    filters.push("include_only_product_fields=" + encodeURIComponent(includeOnlyProductFields));
                 }
                 let includeOnlyProdTax = document.getElementById("include_only_prod_tax")?.value || "";
                 if (includeOnlyProdTax) {
@@ -1116,11 +1190,9 @@ function manage_kids_in_groups()
     $kid_id_param = isset($_GET['kid_id']) ? $_GET['kid_id'] : null;
     $group_param = isset($_GET['group_id']) ? $_GET['group_id'] : null;
     $product_param = isset($_GET['product_id']) ? $_GET['product_id'] : null;
+    $product_field_param = isset($_GET['product_field']) ? $_GET['product_field'] : null;
 
     $exclude_product_fields = isset($_GET['exclude_product_fields']) ? array_map('trim', explode(',', $_GET['exclude_product_fields'])) : [];
-    $include_only_prod_tax = isset($_GET['include_only_prod_tax']) ? array_map('trim', explode(',', $_GET['include_only_prod_tax'])) : [];
-
-
     $excluded_keys = $exclude_product_fields;
 
     if (!is_array($excluded_keys) || empty($excluded_keys)) {
@@ -1136,10 +1208,24 @@ function manage_kids_in_groups()
             '_מספר טלפון',
             '_כתובת אימייל (לשליחת חשבונית) )',
             '_תאריך',
-            '_כתובת אימייל (לשליחת חשבונית)'
+            '_כתובת אימייל (לשליחת חשבונית)',
+            '_אישור פרסום תמונות',
+            ' _זיהוי ילד',
+            '_זיהוי ילד'
         ];
     }
 
+    $include_only_keys = isset($_GET['include_only_product_fields']) ? array_map('trim', explode(',', $_GET['include_only_product_fields'])) : [];
+
+    if (!is_array($include_only_keys) || empty($include_only_keys)) {
+        $include_only_keys = [
+            '_שבוע 1: 1/8 - 28/7',
+            '_שבוע 2: 8/8 - 4/8',
+            '_שבוע 3: 11/8-16/8'
+        ];
+    }
+
+    $include_only_prod_tax = isset($_GET['include_only_prod_tax']) ? array_map('trim', explode(',', $_GET['include_only_prod_tax'])) : [];
     if (!is_array($include_only_prod_tax) || empty($include_only_prod_tax)) {
         $include_only_prod_tax = [
             'camps',
@@ -1177,6 +1263,13 @@ function manage_kids_in_groups()
                     value="<?php echo $age_from_param; ?>">
             </label>
             <label class="dm-label">
+                <span>קבוצה</span>
+                <?php $product_fields = get_all_pruducts_fields($excluded_keys, $include_only_keys); ?>
+                <select id="product-field-filter" name="product-field">
+                    <?php echo render_select_options($product_fields, $product_field_param); ?>
+                </select>
+            </label>
+            <label class="dm-label">
                 <span>מגיל</span>
                 <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
             </label>
@@ -1207,6 +1300,10 @@ function manage_kids_in_groups()
                         id="exclude_product_fields" name="exclude_product_fields"
                         value="<?php echo implode(',', array_values($excluded_keys)); ?>">
                 </label>
+                <label class="dm-label"> <span>כולל רק שדות מוצר</span><input type="text" name="include_only_product_fields"
+                        id="include_only_product_fields" name="include_only_product_fields"
+                        value="<?php echo implode(',', array_values($include_only_keys)); ?>">
+                </label>
                 <label class="dm-label"> <span>כלול רק טקסונומיות של מוצרים</span><input type="text"
                         name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
                         value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
@@ -1226,13 +1323,14 @@ function manage_kids_in_groups()
         <table class="woocommerce-orders-table">
             <thead>
                 <tr>
-                    <th>מזהה הזמנה</th>
-                    <th>פרטי הזמנה</th>
-                    <th>מוצר</th>
-                    <th>שדה מוצר</th>
-                    <th>שם הילד</th>
-                    <th>תעודת זהות הילד</th>
-                    <th>קבוצה</th>
+                    <th class="tab_order_id" column_name="Order Id">מזהה הזמנה</th>
+                    <th class="tab_order_details" column_name="Order Details">פרטי הזמנה</th>
+                    <th class="tab_product" column_name="Product">מוצר</th>
+                    <th class="tab_product_parameter" column_name="Product Parameter">שדה מוצר</th>
+                    <th class="tab_kid_name" column_name="Kid Name">שם הילד</th>
+                    <th class="tab_kid_id" column_name="Kid Id">תעודת זהות הילד</th>
+                    <th class="tab_kid_school" column_name="Kid School">שם בית ספר, גן וכיתה</th>
+                    <th class="tab_groups" column_name="Groups">קבוצה</th>
                 </tr>
             </thead>
             <tbody>
@@ -1272,6 +1370,13 @@ function manage_kids_in_groups()
                         $post_child_url = getChildPostId(cleanMetaValue($child_id));
                         $child_url = ($child_name && $child_id) ? showChildUrl($child_name, $child_id) : null;
                         $child_age = getCustomField($post_child_url, "age");
+                        $child_school = implode(' ', array_filter([
+                            getCustomField($post_child_url, "school_name"),
+                            getCustomField($post_child_url, "class"),
+                            getCustomField($post_child_url, "class_number"),
+                            getCustomField($post_child_url, "kindergarden_type")
+                        ]));
+
 
                         $order_id = $order->get_id() ?? null;
                         $order_item_custom_fields = getCustomFieldsFromProductOrder($item);
@@ -1280,6 +1385,9 @@ function manage_kids_in_groups()
                             $groups = checkGroup($order_id, $child_id, $order_item_custom_field);
 
                             if (in_array($order_item_custom_field, $excluded_keys, true)) {
+                                continue;
+                            }
+                            if (!in_array($order_item_custom_field, $include_only_keys, true)) {
                                 continue;
                             }
 
@@ -1300,6 +1408,9 @@ function manage_kids_in_groups()
                             }
 
                             if (!empty($product_param) && $product_param != $product_id) {
+                                continue;
+                            }
+                            if (!empty($product_field_param) && $product_field_param != $order_item_custom_field) {
                                 continue;
                             }
 
@@ -1333,7 +1444,7 @@ function manage_kids_in_groups()
                                     echo $order_id;
                                     ?>
                                 </td>
-                                <td column="Order Details">
+                                <td column="Order Details" class="row_order_details">
                                     <?php $order_date = $order->get_date_created()->date('Y-m-d') ?? null; ?>
                                     <span><?php echo $order_date; ?></span>
                                     <?php
@@ -1367,7 +1478,7 @@ function manage_kids_in_groups()
                                     ?>
 
                                 </td>
-                                <td column="Product">
+                                <td column="Product" class="row_product">
                                     <?php
                                     $product_details = '
                                     <a href="' . esc_url(get_permalink($product_id)) . '" class="link-dm">
@@ -1377,12 +1488,12 @@ function manage_kids_in_groups()
                                     echo $product_details;
                                     ?>
                                 </td>
-                                <td column="Product Field">
+                                <td column="Product Field" class="row_product_parameter">
                                     <?php
                                     echo $order_item_custom_field;
                                     ?>
                                 </td>
-                                <td column="Child's Name">
+                                <td column="Child's Name" class="row_kid_name">
                                     <?php
                                     echo "<span>" . $child_url ?? 'N/A' . "</span>";
                                     $child_details = '
@@ -1413,12 +1524,17 @@ function manage_kids_in_groups()
                                     echo $child_details;
                                     ?>
                                 </td>
-                                <td column="Child ID">
+                                <td column="Child ID" class="row_kid_id">
                                     <p>
                                         <?php echo $child_id ? $child_id : 'N/A'; ?>
                                     </p>
                                 </td>
-                                <td column="Group" class="group-td">
+                                <td column="Child School" class="row_kid_school">
+                                    <p>
+                                        <?php echo $child_school ? $child_school : 'N/A'; ?>
+                                    </p>
+                                </td>
+                                <td column="Group" class="row_groups group-td">
                                     <span>
                                         <?php echo groupsLinks($groups); ?>
                                     </span>
@@ -1443,17 +1559,18 @@ function manage_kids_in_groups()
                                                     <!-- JSON Data Storage -->
                                                     <script type="application/json"
                                                         id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                                                                                        <?php echo json_encode([
-                                                                                                                            'kid_id' => $child_id,
-                                                                                                                            'kid_name' => $child_name,
-                                                                                                                            'kid_details' => $child_details,
-                                                                                                                            'order_id' => $order_id,
-                                                                                                                            'order_date' => $order_date,
-                                                                                                                            'order_details' => $order_details,
-                                                                                                                            'product_details' => $product_details,
-                                                                                                                            'product_field' => $order_item_custom_field
-                                                                                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                                    </script>
+                                                                                                                                                                                            <?php echo json_encode([
+                                                                                                                                                                                                'kid_id' => $child_id,
+                                                                                                                                                                                                'kid_name' => $child_name,
+                                                                                                                                                                                                'kid_school' => $child_school,
+                                                                                                                                                                                                'kid_details' => $child_details,
+                                                                                                                                                                                                'order_id' => $order_id,
+                                                                                                                                                                                                'order_date' => $order_date,
+                                                                                                                                                                                                'order_details' => $order_details,
+                                                                                                                                                                                                'product_details' => $product_details,
+                                                                                                                                                                                                'product_field' => $order_item_custom_field
+                                                                                                                                                                                            ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                                                                                                                                    </script>
                                                 </div>
                                             </div>
                                         </div>
