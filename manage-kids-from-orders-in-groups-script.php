@@ -96,25 +96,38 @@ function render_buttons_for_requests()
     return $html_section;
 }
 
-function get_all_groups_options($group_value_selected = null)
+function get_all_groups_options($group_value_selected = null, $args = array())
 {
+    $args = wp_parse_args($args, array(
+        'nogroup' => true,
+        'allgroups' => true
+    ));
+
     $groups = get_posts(array('post_type' => 'camp-group', 'numberposts' => -1));
 
     if (empty($groups)) {
         return '<option value="">No Groups Found</option>';
     }
-    $group_options = '<option value="all-groups" ' . selected($group_value_selected, "all-groups", false) . '>כל הקבוצות</option>';
-    $group_options .= '<option value="no-group" ' . selected($group_value_selected, "no-group", false) . '>אין קבוצות</option>';
+
+    $group_options = '';
+
+    if ($args['allgroups']) {
+        $group_options .= '<option value="all-groups" ' . selected($group_value_selected, "all-groups", false) . '>כל הקבוצות</option>';
+    }
+
+    if ($args['nogroup']) {
+        $group_options .= '<option value="no-group" ' . selected($group_value_selected, "no-group", false) . '>אין קבוצות</option>';
+    }
 
     foreach ($groups as $group) {
         $group_id = esc_attr($group->ID);
         $group_name = esc_html($group->post_title);
-
         $group_options .= '<option value="' . $group_id . '" ' . selected($group_value_selected, $group_id, false) . '>' . $group_name . '</option>';
     }
 
     return $group_options;
 }
+
 function get_all_pruducts_fields($excluded_keys = [], $include_only_keys = [], $args = null)
 {
     if (!$args) {
@@ -724,8 +737,13 @@ function custom_code_css_js_manage_kids_in_groups()
 
         .dm-table .popup-style.group-box {
             right: auto;
+            margin-left: 93px;
             width: auto;
+            margin-top: -22px;
             min-width: 160px;
+        }
+        .dm-table .popup-style.group-box .group-checkboxes{
+            width: 100%;
         }
 
         .dm-table .popup-style.child-details-box {
@@ -793,6 +811,30 @@ function custom_code_css_js_manage_kids_in_groups()
             font-size: 12px;
             line-height: 14px;
         }
+        .dm-bulk-section {
+            justify-content: end;
+            align-items: end;
+        }
+        @media only screen and (min-width: 900px) {
+            .dm-bulk-section {
+                margin-bottom: -42px;
+                width: 50%;
+                position: absolute;
+                left: 0;
+            }
+         }
+        
+        .dm-bulk-section select {
+            padding: 4px 15px;
+            width: 200px;
+        }
+        .dm-bulk-section label {
+            margin-bottom: 0px !important;
+        }
+        .dm-bulk-section label span{
+            font-size: 12px;
+            line-height: 14px;
+        }
 
         .row_kid_id,
         .tab_kid_id {
@@ -801,6 +843,13 @@ function custom_code_css_js_manage_kids_in_groups()
 
         [column_name="Kid Id"] {
             display: none;
+        }
+
+        [column_name="Updates"], [class="row_update"] {
+            /*display: none;*/
+        }
+        [column="Group"] {
+            text-align: end;
         }
     </style>
 
@@ -817,9 +866,20 @@ function custom_code_css_js_manage_kids_in_groups()
     ?>
 
     <script>
+
         function toggleDetails(button) {
             var details = button.closest("td").querySelector(".show-more-details");
             if (details) {
+                if (button.closest('.row_groups')) {
+                    let allRowGroups = document.querySelectorAll('.row_groups .show-more-details');
+                    allRowGroups.forEach(function (otherDetails) {
+                        if (otherDetails !== details) {
+                            otherDetails.style.display = 'none';
+                        }
+                    });
+
+                }
+
                 if (details.style.display === "none") {
                     details.style.display = "block";
                     button.textContent = "-";
@@ -847,7 +907,7 @@ function custom_code_css_js_manage_kids_in_groups()
                 button.textContent = "+";
             }
         }
-        function updatePostGroups(button) {
+        function updatePostGroups(button, preselectedGroup = null) {
             const kidId = button.getAttribute('kid_id');
             const orderItemCustomField = button.getAttribute('order_item_custom_field');
             const orderId = button.getAttribute('order_id');
@@ -862,6 +922,7 @@ function custom_code_css_js_manage_kids_in_groups()
                 console.error('Kid data script not found!');
                 return;
             }
+
             let kidData;
             try {
                 kidData = JSON.parse(kidDataScript.textContent);
@@ -869,35 +930,38 @@ function custom_code_css_js_manage_kids_in_groups()
                 console.error('Failed to parse kid data:', e);
                 return;
             }
+
             if (!kidData || !kidData.kid_id || !kidData.kid_name) {
                 console.error('Incomplete kid data!');
                 return;
             }
-            console.log("Kid Data:", kidData);
+
             const showMoreDetailsContainer = button.closest('.show-more-details');
-            console.log(showMoreDetailsContainer);
             if (!showMoreDetailsContainer) {
                 console.error('No .show-more-details container found!');
                 return;
             }
 
             const groupCheckboxesContainer = showMoreDetailsContainer.querySelector('.group-checkboxes');
-
-
             if (!groupCheckboxesContainer) {
                 console.error('No .group-checkboxes container found!');
                 return;
             }
-            const selectedGroups = [];
 
-            const noGroupCheckbox = groupCheckboxesContainer.querySelector(".no-group:checked");
-            if (noGroupCheckbox) {
-                selectedGroups.push("no-group");
+            const selectedGroups = [];
+            if (preselectedGroup) {
+                selectedGroups.push(preselectedGroup); 
             } else {
-                groupCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked').forEach((checkbox) => {
-                    selectedGroups.push(checkbox.value);
-                });
+                const noGroupCheckbox = groupCheckboxesContainer.querySelector(".no-group:checked");
+                if (noGroupCheckbox) {
+                    selectedGroups.push("no-group");
+                } else {
+                    groupCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked').forEach((checkbox) => {
+                        selectedGroups.push(checkbox.value);
+                    });
+                }
             }
+
             const data = {
                 action: "update_groups_for_kid",
                 groups: selectedGroups,
@@ -914,26 +978,63 @@ function custom_code_css_js_manage_kids_in_groups()
 
             console.log("Data to send:", data);
 
-            jQuery.post(ajaxurl, data, function (response) {
-                console.log("Server response:", response);
+            return jQuery.post(ajaxurl, data, function (response) {
+                    console.log("Server response:", response);
 
-                if (response.success) {
-                    if (selectedGroups.includes("no-group")) {
-                        //alert("Kid removed from all groups.\n\nServer Message: " + response.data);
-                        location.reload();
+                    if (response.success) {
+                        console.log("Data:", data);
+                        if (selectedGroups.includes("no-group")) {
+                            //alert("Kid removed from all groups.\n\nServer Message: " + response.data);
+                            //location.reload();
+                        } else {
+                            //alert("Groups updated successfully!\n\nServer Message: " + response.data);
+                            //location.reload();
+                        }
                     } else {
-                        //alert("Groups updated successfully!\n\nServer Message: " + response.data);
-                        location.reload();
+                        alert("Error updating groups.\n\nServer Message: " + (response.data || "Unknown error"));
                     }
-                } else {
-                    alert("Error updating groups.\n\nServer Message: " + (response.data || "Unknown error"));
-                }
-                if (dmTable) {
-                    setTimeout(function () {
+
+                    if (dmTable) {
                         dmTable.classList.remove('animation');
-                    }, 2000);
+                    }
+                });
+        }
+        async function updateTable(queryTable) {
+            const dmTable = document.querySelector('.dm-table');
+            if (dmTable) { dmTable.classList.add('animation'); }
+
+            let table = document.querySelector(`#${queryTable}`);
+            if (!table) {
+                console.warn(`Table with ID "${queryTable}" not found.`);
+                return;
+            }
+
+            console.log(`Updating table: ${queryTable}`);
+
+            let rows = table.querySelectorAll("tr");
+            
+            const selectedGroup = document.querySelector('#group-update-bulk')?.value || null;
+
+            for (let row of rows) {
+                let updateCheckbox = row.querySelector("td[column='Updates'].row_update input[type='checkbox'][value='update']");
+
+                if (updateCheckbox && updateCheckbox.checked) {
+                    let button = row.querySelector("td[column='Group'] button[name='manage-groups']");
+
+                    if (button) {
+                        try {
+                            await updatePostGroups(button, selectedGroup);
+                        } catch (error) {
+                            console.error("Error updating group:", error);
+                        }
+                    } else {
+                        console.warn(`Button not found in row: ${row.rowIndex}`);
+                    }
                 }
-            });
+            }
+
+            if (dmTable) { dmTable.classList.remove('animation'); }
+            location.reload();
         }
         function applyFilters() {
             let filters = [];
@@ -1003,27 +1104,34 @@ function custom_code_css_js_manage_kids_in_groups()
             let currentUrl = window.location.href.split('?')[0];
             window.location.href = currentUrl + "?" + queryString;
         }
-
         function resetFilters() {
             window.location.href = window.location.pathname;
         }
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("tr .group-checkboxes input[type='checkbox']").forEach(function (checkbox) {
+                checkbox.addEventListener("change", function () {
+                    let row = this.closest("tr");
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const checkboxes = document.querySelectorAll('.group-checkboxes input[type="checkbox"]');
+                    if (row) {
+                        let updateCheckbox = row.querySelector("td[column='Updates'] input[type='checkbox'][value='update']");
+                        let allCheckboxes = row.querySelectorAll(".group-checkboxes input[type='checkbox']");
+                        let anyChecked = Array.from(allCheckboxes).some(cb => cb.checked);
 
-            checkboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', function () {
-                    if (this.checked) {
-                        checkboxes.forEach(otherCheckbox => {
-                            if (otherCheckbox !== this) {
-                                otherCheckbox.checked = false;
-                            }
-                        });
+                        if (updateCheckbox) {
+                            updateCheckbox.checked = anyChecked;
+                        }
+
+                        if (this.checked) {
+                            row.querySelectorAll('.group-checkboxes input[type="checkbox"]').forEach(otherCheckbox => {
+                                if (otherCheckbox !== this) {
+                                    otherCheckbox.checked = false;
+                                }
+                            });
+                        }
                     }
                 });
             });
         });
-
         document.addEventListener("DOMContentLoaded", function () {
             document.querySelectorAll(".dm-table").forEach((table) => {
                 let tableName = table.getAttribute("name") || "table";
@@ -1069,7 +1177,6 @@ function custom_code_css_js_manage_kids_in_groups()
                 table.insertAdjacentElement("afterend", container);
             });
         });
-
         function downloadTableCSV(table, filename, delimiter) {
             delimiter = delimiter || ",";
             let csv = [];
@@ -1331,6 +1438,7 @@ function manage_kids_in_groups()
                     <th class="tab_kid_id" column_name="Kid Id">תעודת זהות הילד</th>
                     <th class="tab_kid_school" column_name="Kid School">שם בית ספר, גן וכיתה</th>
                     <th class="tab_groups" column_name="Groups">קבוצה</th>
+                    <th class="tab_updates" column_name="Updates">*</th>
                 </tr>
             </thead>
             <tbody>
@@ -1556,25 +1664,27 @@ function manage_kids_in_groups()
                                                         להחיל
                                                     </button>
 
+                                                    <?php $dataJson = json_encode([
+                                                        'kid_id' => $child_id,
+                                                        'kid_name' => $child_name,
+                                                        'kid_school' => $child_school,
+                                                        'kid_details' => $child_details,
+                                                        'order_id' => $order_id,
+                                                        'order_date' => $order_date,
+                                                        'order_details' => $order_details,
+                                                        'product_details' => $product_details,
+                                                        'product_field' => $order_item_custom_field
+                                                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                                                    
                                                     <!-- JSON Data Storage -->
-                                                    <script type="application/json"
-                                                        id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                                                                                                                                                                            <?php echo json_encode([
-                                                                                                                                                                                                'kid_id' => $child_id,
-                                                                                                                                                                                                'kid_name' => $child_name,
-                                                                                                                                                                                                'kid_school' => $child_school,
-                                                                                                                                                                                                'kid_details' => $child_details,
-                                                                                                                                                                                                'order_id' => $order_id,
-                                                                                                                                                                                                'order_date' => $order_date,
-                                                                                                                                                                                                'order_details' => $order_details,
-                                                                                                                                                                                                'product_details' => $product_details,
-                                                                                                                                                                                                'product_field' => $order_item_custom_field
-                                                                                                                                                                                            ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                                                                                                                                    </script>
+                                                    <script type="application/json" id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>"><?php echo $dataJson; ?> </script>
                                                 </div>
                                             </div>
                                         </div>
                                     </span>
+                                </td>
+                                <td column="Updates" class="row_update" >
+                                    <input type="checkbox" value="update" json-id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">                                                                                                                                                           
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -1583,6 +1693,15 @@ function manage_kids_in_groups()
                 endforeach; ?>
             </tbody>
         </table>
+        <div class="dm-flex dm-bulk-section">
+            <label class="dm-label">
+                <span>עדכון קבוצתי בכמות גדולה</span>
+                <select id="group-update-bulk" name="group-update-bulk" style="width:200px;">
+                    <?php echo get_all_groups_options('no-group', array('nogroup' => true, 'allgroups' => false)); ?>
+                </select>
+            </label>
+            <button class="btn-primary-dm btn-requests-dm" onclick="updateTable('products-from-orders table')">עדכון טבלה</button>
+        </div>
     </div>
     <?php
     echo custom_code_css_js_manage_kids_in_groups();
