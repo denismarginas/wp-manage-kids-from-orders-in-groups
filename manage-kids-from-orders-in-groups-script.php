@@ -4,6 +4,27 @@
 // Define Functions - Start
 // -------------------------
 
+
+// Add Prefered Date in Site Settings /wp-admin/options-general.php
+add_action('admin_init', function () {
+    register_setting('general', 'preferred_date', [
+        'type' => 'string',
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => ''
+    ]);
+
+    add_settings_field(
+        'preferred_date',
+        'Preferred Date',
+        function () {
+            $value = get_option('preferred_date');
+            echo '<input type="date" id="preferred_date" name="preferred_date" value="' . esc_attr($value) . '" class="regular-text">';
+        },
+        'general'
+    );
+});
+
+
 function cleanMetaValue($value)
 {
     if (empty($value)) {
@@ -11,6 +32,8 @@ function cleanMetaValue($value)
     }
     $value = preg_replace('/<span class="woocommerce-Price-currencySymbol.*?<\/span>/si', '', $value);
     $value = preg_replace('/<span class="woocommerce-Price-amount.*?<\/span>/si', '', $value);
+    $value = preg_replace('/<span class="(?:woocommerce-Price-(?:currencySymbol|amount)|dashicons dashicons-yes)".*?<\/span>/si', '', $value);
+
 
     return $value;
 }
@@ -63,9 +86,40 @@ function getChildUrl($child_id)
     return '';
 }
 
-function get_all_products($product_id_param = null)
+function get_all_products($product_id_param = null, $include_only_prod_tax = [])
 {
-    $products = wc_get_products(array('limit' => -1));
+    $args = ['limit' => -1];
+
+    if (!empty($include_only_prod_tax)) {
+        $tax_query = ['relation' => 'AND'];
+
+        if (array_values($include_only_prod_tax) === $include_only_prod_tax) {
+            $tax_query[] = [
+                'taxonomy' => 'product_cat',
+                'field' => 'slug',
+                'terms' => $include_only_prod_tax,
+                'operator' => 'IN'
+            ];
+        } else {
+            foreach ($include_only_prod_tax as $taxonomy => $terms) {
+                if (empty($terms))
+                    continue;
+
+                $tax_query[] = [
+                    'taxonomy' => $taxonomy,
+                    'field' => 'slug',
+                    'terms' => $terms,
+                    'operator' => 'IN'
+                ];
+            }
+        }
+
+        if (count($tax_query) > 1) {
+            $args['tax_query'] = $tax_query;
+        }
+    }
+
+    $products = wc_get_products($args);
 
     if (empty($products)) {
         return '<option value="">No Products Found</option>';
@@ -84,6 +138,8 @@ function get_all_products($product_id_param = null)
 
     return $product_options;
 }
+
+
 function render_buttons_for_requests()
 {
     $page_id_1 = '6650';
@@ -148,10 +204,13 @@ function get_all_pruducts_fields($excluded_keys = [], $include_only_keys = [], $
                 if (in_array($order_item_custom_field, $excluded_keys)) {
                     continue;
                 }
+                /*
                 if (!in_array($order_item_custom_field, $include_only_keys)) {
                     continue;
+                }*/
+                if (!empty($include_only_keys) && !in_array($order_item_custom_field, $include_only_keys)) {
+                    continue;
                 }
-
                 if (!in_array($order_item_custom_field, $product_fields)) {
                     $product_fields[] = $order_item_custom_field;
                 }
@@ -162,6 +221,48 @@ function get_all_pruducts_fields($excluded_keys = [], $include_only_keys = [], $
     return $product_fields;
 }
 
+function get_all_product_fields_with_values($excluded_keys = [], $include_only_keys = [], $args = null)
+{
+    if (!$args) {
+        $args = ['limit' => -1];
+    }
+
+    $orders = wc_get_orders($args);
+    if (!$orders) {
+        return ['all'];
+    }
+
+    $field_value_combinations = ['all'];
+    $seen = [];
+
+    foreach ($orders as $order) {
+        foreach ($order->get_items() as $item_id => $item) {
+            $order_item_custom_fields = getCustomFieldsFromProductOrder($item);
+
+            foreach ($order_item_custom_fields as $field_name => $key_item) {
+                if (in_array($field_name, $excluded_keys)) {
+                    continue;
+                }
+                if (!empty($include_only_keys) && !in_array($field_name, $include_only_keys)) {
+                    continue;
+                }
+
+                $value = cleanMetaValue(getValueOfCustomFieldFromProductOrder($field_name, $item));
+                $combo = "{$field_name}: {$value}";
+
+                if (!isset($seen[$combo])) {
+                    $field_value_combinations[] = $combo;
+                    $seen[$combo] = true;
+                }
+            }
+        }
+    }
+
+    return $field_value_combinations;
+}
+
+
+
 function render_select_options($options = [], $default = null)
 {
     $output = '';
@@ -171,6 +272,15 @@ function render_select_options($options = [], $default = null)
         $output .= '<option value="' . $value . '"' . $selected . '>' . $value . '</option>';
     }
 
+    return $output;
+}
+function render_order_status_list($statuses = [], $default = null)
+{
+    $output = '';
+    foreach ($statuses as $slug => $label) {
+        $selected = ($default !== null && $default === $slug) ? ' selected' : '';
+        $output .= '<option value="' . esc_attr($slug) . '"' . $selected . '>' . esc_html($label) . '</option>';
+    }
     return $output;
 }
 
@@ -240,6 +350,53 @@ function customFieldsOfPost($postId)
     }
 }
 
+function get_post_id_from_url($input)
+{
+    if (is_numeric($input)) {
+        return intval($input);
+    }
+    return url_to_postid($input);
+}
+
+function renderAgeFieldsOfPost($post_id)
+{
+    if (empty($post_id)) {
+        echo 'N/A';
+        return;
+    }
+
+    $keys_to_try = ['Age', 'age', 'AGE'];
+    $age = '';
+
+    foreach ($keys_to_try as $key) {
+        $value = get_post_meta($post_id, $key, true);
+        if (!empty($value)) {
+            $age = $value;
+            break;
+        }
+    }
+
+    echo !empty($age) ? esc_html($age) : 'N/A';
+}
+
+function renderGenderFieldsOfPost($post_id)
+{
+    if (empty($post_id)) {
+        echo 'N/A';
+        return;
+    }
+
+    // Try both post_meta and ACF (if available)
+    $gender = get_post_meta($post_id, 'Gender', true);
+
+    if (empty($gender)) {
+        $gender = get_field('gender', $post_id); // ACF fallback
+    }
+
+    echo !empty($gender) ? esc_html($gender) : 'N/A';
+}
+
+
 function getCustomFieldsFromProductOrder($order_item, $excluded_keys = [])
 {
     $meta_data = $order_item->get_meta_data();
@@ -258,6 +415,12 @@ function getCustomFieldsFromProductOrder($order_item, $excluded_keys = [])
     return $custom_fields;
 }
 
+function getValueOfCustomFieldFromProductOrder($key, $order_item, $excluded_keys = [])
+{
+    $custom_fields = getCustomFieldsFromProductOrder($order_item, $excluded_keys);
+
+    return isset($custom_fields[$key]) ? $custom_fields[$key] : null;
+}
 
 function renderCustomFieldsFromProductOrder($custom_fields)
 {
@@ -283,7 +446,6 @@ function enqueue_my_custom_script()
 }
 add_action('wp_enqueue_scripts', 'enqueue_my_custom_script');
 
-
 add_action('wp_ajax_update_groups_for_kid', 'update_groups_for_kid_callback');
 
 function update_groups_for_kid_callback()
@@ -298,6 +460,7 @@ function update_groups_for_kid_callback()
         $order_details = $_POST['order_details'];
         $product_details = $_POST['product_details'];
         $product_field = $_POST['product_field'];
+        $product_field_value = $_POST['product_field_value'];
 
         $groups = is_array($_POST['groups']) ? $_POST['groups'] : [];
 
@@ -349,7 +512,8 @@ function update_groups_for_kid_callback()
                         'order_date' => $order_date,
                         'order_details' => $order_details,
                         'product_details' => $product_details,
-                        'product_field' => $product_field
+                        'product_field' => $product_field,
+                        'product_field_value' => $product_field_value
                     ];
                     update_field('kids_list', $kids_list, $group_post->ID);
                 }
@@ -499,6 +663,25 @@ function getCustomField($postId, $fieldName)
 
     return $fieldValue;
 }
+
+function get_order_status_list()
+{
+    if (!function_exists('wc_get_order_statuses')) {
+        return array();
+    }
+
+    $statuses = wc_get_order_statuses(); // Returns array like: ['wc-pending' => 'Pending payment', ...]
+
+    // Optionally, remove the 'wc-' prefix for cleaner keys
+    $cleaned_statuses = array();
+    foreach ($statuses as $key => $label) {
+        $cleaned_key = str_replace('wc-', '', $key);
+        $cleaned_statuses[$cleaned_key] = $label;
+    }
+
+    return $cleaned_statuses;
+}
+
 
 function custom_code_css_js_manage_kids_in_groups()
 {
@@ -742,7 +925,8 @@ function custom_code_css_js_manage_kids_in_groups()
             margin-top: -22px;
             min-width: 160px;
         }
-        .dm-table .popup-style.group-box .group-checkboxes{
+
+        .dm-table .popup-style.group-box .group-checkboxes {
             width: 100%;
         }
 
@@ -811,10 +995,12 @@ function custom_code_css_js_manage_kids_in_groups()
             font-size: 12px;
             line-height: 14px;
         }
+
         .dm-bulk-section {
             justify-content: end;
             align-items: end;
         }
+
         @media only screen and (min-width: 900px) {
             .dm-bulk-section {
                 margin-bottom: -42px;
@@ -822,16 +1008,18 @@ function custom_code_css_js_manage_kids_in_groups()
                 position: absolute;
                 left: 0;
             }
-         }
-        
+        }
+
         .dm-bulk-section select {
             padding: 4px 15px;
             width: 200px;
         }
+
         .dm-bulk-section label {
             margin-bottom: 0px !important;
         }
-        .dm-bulk-section label span{
+
+        .dm-bulk-section label span {
             font-size: 12px;
             line-height: 14px;
         }
@@ -845,11 +1033,41 @@ function custom_code_css_js_manage_kids_in_groups()
             display: none;
         }
 
-        [column_name="Updates"], [class="row_update"] {
+        [column_name="Updates"],
+        [class="row_update"] {
             /*display: none;*/
         }
+
         [column="Group"] {
             text-align: end;
+        }
+
+        .order-status {
+            font-size: 10px;
+            line-height: 14px;
+            font-weight: 600;
+            width: 100%;
+            display: block;
+            position: absolute;
+            opacity: 0;
+            bottom: 4px;
+            right: 10px;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .woocommerce-orders-table tr:hover [column="Order ID"] .order-status {
+            opacity: 1;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .count-items {
+            font-size: 16px;
+            font-weight: 600;
+            padding: 5px 16px;
+            border: 1px solid rgb(64, 66, 66) !important;
+            line-height: 22px;
+            border-radius: 6px;
+            color: rgb(64, 66, 66) !important;
         }
     </style>
 
@@ -950,7 +1168,7 @@ function custom_code_css_js_manage_kids_in_groups()
 
             const selectedGroups = [];
             if (preselectedGroup) {
-                selectedGroups.push(preselectedGroup); 
+                selectedGroups.push(preselectedGroup);
             } else {
                 const noGroupCheckbox = groupCheckboxesContainer.querySelector(".no-group:checked");
                 if (noGroupCheckbox) {
@@ -973,31 +1191,36 @@ function custom_code_css_js_manage_kids_in_groups()
                 order_date: kidData.order_date,
                 order_details: kidData.order_details,
                 product_details: kidData.product_details,
-                product_field: kidData.product_field
+                product_field: kidData.product_field,
+                product_field_value: kidData.product_field_value
             };
 
             console.log("Data to send:", data);
 
             return jQuery.post(ajaxurl, data, function (response) {
-                    console.log("Server response:", response);
+                console.log("Server response:", response);
 
-                    if (response.success) {
-                        console.log("Data:", data);
-                        if (selectedGroups.includes("no-group")) {
-                            //alert("Kid removed from all groups.\n\nServer Message: " + response.data);
-                            //location.reload();
-                        } else {
-                            //alert("Groups updated successfully!\n\nServer Message: " + response.data);
-                            //location.reload();
-                        }
+                if (response.success) {
+                    console.log("Data:", data);
+                    if (selectedGroups.includes("no-group")) {
+                        //alert("Kid removed from all groups.\n\nServer Message: " + response.data);
+                        //location.reload();
                     } else {
-                        alert("Error updating groups.\n\nServer Message: " + (response.data || "Unknown error"));
+                        //alert("Groups updated successfully!\n\nServer Message: " + response.data);
+                        //location.reload();
                     }
+                    if (button.closest('.show-more-details').style.display === 'block') {
+                        button.closest('.show-more-details').style.display = 'none';
+                    }
+                    button.closest('td[column="Group"]').style.background = 'rgb(121 181 89 / 51%)';
+                } else {
+                    alert("Error updating groups.\n\nServer Message: " + (response.data || "Unknown error"));
+                }
 
-                    if (dmTable) {
-                        dmTable.classList.remove('animation');
-                    }
-                });
+                if (dmTable) {
+                    dmTable.classList.remove('animation');
+                }
+            });
         }
         async function updateTable(queryTable) {
             const dmTable = document.querySelector('.dm-table');
@@ -1012,7 +1235,7 @@ function custom_code_css_js_manage_kids_in_groups()
             console.log(`Updating table: ${queryTable}`);
 
             let rows = table.querySelectorAll("tr");
-            
+
             const selectedGroup = document.querySelector('#group-update-bulk')?.value || null;
 
             for (let row of rows) {
@@ -1098,6 +1321,16 @@ function custom_code_css_js_manage_kids_in_groups()
                 if (includeOnlyProdTax) {
                     filters.push("include_only_prod_tax=" + encodeURIComponent(includeOnlyProdTax));
                 }
+                let includeOnlyStatusOrder = document.getElementById("include_only_order_status")?.value || "";
+                if (includeOnlyStatusOrder) {
+                    filters.push("include_only_order_status=" + encodeURIComponent(includeOnlyStatusOrder));
+                }
+
+                let excludeOrdersNotFinalizedCheckbox = document.getElementById("excule_orders_not_finalized");
+                if (excludeOrdersNotFinalizedCheckbox?.checked) {
+                    filters.push("excule_orders_not_finalized=1");
+                }
+
             }
 
             let queryString = filters.join("&");
@@ -1190,7 +1423,7 @@ function custom_code_css_js_manage_kids_in_groups()
 
                 row.querySelectorAll("th, td").forEach((cell) => {
                     let text = cell.cloneNode(true);
-                    text.querySelectorAll("button, script, .group-box, .view-order").forEach(el => el.remove());
+                    text.querySelectorAll("button, script, .group-box, .view-order, span.order-status").forEach(el => el.remove());
 
                     if (isSimpleExport) {
                         text.querySelectorAll(".show-more-details, .popup-style, .child-details-box").forEach(el => el.remove());
@@ -1226,7 +1459,7 @@ function custom_code_css_js_manage_kids_in_groups()
                     if (extraDetails.length > 0) {
                         finalText += "\n" + extraDetails.join("\n");
                     }
-
+                    finalText = finalText.replaceAll(delimiter, "");
                     finalText = finalText.replace(/"/g, '""');
                     rowData.push(finalText);
                 });
@@ -1249,12 +1482,18 @@ function custom_code_css_js_manage_kids_in_groups()
             });
 
             console.log("Final CSV Output:\n", csv.join("\n"));
-
+            /*
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csv.join("\n");
             let encodedUri = encodeURI(csvContent);
             let link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", filename);
+            */
+            const csvContent = csv.join('\n');
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM for Hebrew
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1285,12 +1524,30 @@ function manage_kids_in_groups()
         return '<p class="dm-error-section">אין לך הרשאה לצפות בתוכן.</p>';
     }
 
-    $args = array('limit' => -1, );
-    $date_param = isset($_GET['date']) ? $_GET['date'] : date('d-m-Y', strtotime('-7 days'));
-    $date = DateTime::createFromFormat('d-m-Y', $date_param);
-    if ($date) {
-        $args['date_query'] = array('after' => $date->format('Y-m-d'), );
+    $args = array('limit' => -1);
+
+    $date_param = null;
+
+    if (!empty($_GET['date']) && strtotime($_GET['date']) !== false) {
+        $date_param = $_GET['date'];
+    } else {
+        $preferred_date = get_option('preferred_date');
+        if (!empty($preferred_date) && strtotime($preferred_date) !== false) {
+            $date_param = $preferred_date;
+        } else {
+            $date_param = date('Y-m-d', strtotime('-7 days'));
+        }
     }
+
+    $date = DateTime::createFromFormat('Y-m-d', $date_param);
+
+    if ($date instanceof DateTime) {
+        $args['date_query'] = array(
+            'after' => $date->format('Y-m-d'),
+            'inclusive' => true, // <-- include the date itself
+        );
+    }
+
     $age_from_param = isset($_GET['age_from']) ? $_GET['age_from'] : null;
     $age_to_param = isset($_GET['age_to']) ? $_GET['age_to'] : null;
     $kid_name_param = isset($_GET['kid_name']) ? $_GET['kid_name'] : null;
@@ -1318,7 +1575,11 @@ function manage_kids_in_groups()
             '_כתובת אימייל (לשליחת חשבונית)',
             '_אישור פרסום תמונות',
             ' _זיהוי ילד',
-            '_זיהוי ילד'
+            '_ת.ז ילד',
+            '_pewc_product_extra_id',
+            '_מספר שבועות',
+            '_הנחת שבועיים',
+            '_הנחת שבועיים צהרון'
         ];
     }
 
@@ -1328,17 +1589,32 @@ function manage_kids_in_groups()
         $include_only_keys = [
             '_שבוע 1: 1/8 - 28/7',
             '_שבוע 2: 8/8 - 4/8',
-            '_שבוע 3: 11/8-16/8'
+            '_שבוע 3: 11/8-16/8',
+            '_שבוע 1: 27/7-31/7',
+            '_שבוע 1',
+            '_שבוע 2',
+            '_שבוע 3',
+            '_שבוע 4',
+            '_שבוע 5'
         ];
     }
 
     $include_only_prod_tax = isset($_GET['include_only_prod_tax']) ? array_map('trim', explode(',', $_GET['include_only_prod_tax'])) : [];
     if (!is_array($include_only_prod_tax) || empty($include_only_prod_tax)) {
         $include_only_prod_tax = [
-            'camps',
-            'קייטנות'
+            'show-camp'
         ];
     }
+    $order_status_list = array_merge(['all' => 'All'], get_order_status_list());
+
+
+    $include_only_order_status = isset($_GET['include_only_order_status'])
+        ? ($_GET['include_only_order_status'] !== 'all'
+            ? sanitize_text_field($_GET['include_only_order_status'])
+            : null)
+        : 'completed';
+    $exclude_orders_not_finalized = isset($_GET['excule_orders_not_finalized']) && $_GET['excule_orders_not_finalized'] == '1';
+
 
     $orders = wc_get_orders($args);
 
@@ -1356,7 +1632,7 @@ function manage_kids_in_groups()
         <div class="filters dm-flex">
             <label class="dm-label"><span> מוצר </span>
                 <select id="product-filter" name="product">
-                    <?php echo get_all_products($product_param); ?>
+                    <?php echo get_all_products($product_param, $include_only_prod_tax); ?>
                 </select>
             </label>
             <label class="dm-label"><span>קבוצה</span>
@@ -1370,15 +1646,15 @@ function manage_kids_in_groups()
                     value="<?php echo $age_from_param; ?>">
             </label>
             <label class="dm-label">
-                <span>קבוצה</span>
-                <?php $product_fields = get_all_pruducts_fields($excluded_keys, $include_only_keys); ?>
+                <span>עד גיל</span>
+                <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
+            </label>
+            <label class="dm-label">
+                <span>הרשמה לקבוצה</span>
+                <?php $product_fields = get_all_product_fields_with_values($excluded_keys, $include_only_keys); ?>
                 <select id="product-field-filter" name="product-field">
                     <?php echo render_select_options($product_fields, $product_field_param); ?>
                 </select>
-            </label>
-            <label class="dm-label">
-                <span>מגיל</span>
-                <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
             </label>
             <label class="dm-label">
                 <span>ת.ז ילד</span>
@@ -1415,6 +1691,52 @@ function manage_kids_in_groups()
                         name="include_only_prod_tax" id="include_only_prod_tax" name="include_only_prod_tax"
                         value="<?php echo implode(',', array_values($include_only_prod_tax)); ?>">
                 </label>
+
+                <label class="dm-label"> <span>כלול סטטוס הזמנה בלבד</span>
+                    <select id="include_only_order_status" name="include_only_order_status">
+                        <?php
+                        echo render_order_status_list($order_status_list, !empty($include_only_order_status) ? $include_only_order_status : 'all');
+                        ?>
+                    </select>
+                </label>
+                <label class="dm-label"> <span>הסתר הזמנות שלא שולמו</span>
+                    <div>
+                        <input type="checkbox" value="excule_orders_not_finalized" id="excule_orders_not_finalized" <?php if ($excule_orders_not_finalized)
+                            echo "checked"; ?>>
+                        <span> הצג הזמנות ששולמו בלבד</span>
+                    </div>
+                </label>
+                <?php
+                add_action('admin_post_update_preferred_date', function () {
+                    if (
+                        isset($_POST['preferred_date'], $_POST['update_preferred_date_nonce']) &&
+                        current_user_can('manage_options') &&
+                        wp_verify_nonce($_POST['update_preferred_date_nonce'], 'update_preferred_date_action')
+                    ) {
+                        update_option('preferred_date', sanitize_text_field($_POST['preferred_date']));
+                    }
+                    wp_redirect($_POST['_wp_http_referer'] ?? admin_url());
+                    exit;
+                });
+                $preferred_date = get_option('preferred_date');
+                ?>
+
+                <?php if (isset($preferred_date)): ?>
+                    <form method="POST" action="<?php echo admin_url('admin-post.php'); ?>" class="d-flex"
+                        style="width: 100%; min-width: 100%; display:none">
+                        <input type="hidden" name="action" value="update_preferred_date">
+                        <input type="hidden" name="_wp_http_referer" value="<?php echo esc_url($_SERVER['REQUEST_URI']); ?>">
+                        <?php wp_nonce_field('update_preferred_date_action', 'update_preferred_date_nonce'); ?>
+                        <div class="dm-flex" style="align-items: end;">
+                            <label class="dm-label" style="margin: 0px !important;">
+                                <span>Preferred Date</span>
+                                <input type="date" name="preferred_date" id="preferred_date"
+                                    value="<?php echo esc_attr($preferred_date); ?>">
+                            </label>
+                            <button type="submit" class="btn-primary-dm">Save Date</button>
+                        </div>
+                    </form>
+                <?php endif; ?>
             </div>
         </div>
         </p>
@@ -1436,13 +1758,17 @@ function manage_kids_in_groups()
                     <th class="tab_product_parameter" column_name="Product Parameter">שדה מוצר</th>
                     <th class="tab_kid_name" column_name="Kid Name">שם הילד</th>
                     <th class="tab_kid_id" column_name="Kid Id">תעודת זהות הילד</th>
+                    <th class="tab_kid_age" column_name="Kid Age"> גיל הילד </th>
+                    <th class="tab_kid_gender" column_name="Kid Gender"> מין הילד </th>
                     <th class="tab_kid_school" column_name="Kid School">שם בית ספר, גן וכיתה</th>
                     <th class="tab_groups" column_name="Groups">קבוצה</th>
                     <th class="tab_updates" column_name="Updates">*</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($orders as $order):
+                <?php
+                $count_items = 0;
+                foreach ($orders as $order):
                     foreach ($order->get_items() as $item_id => $item):
                         $product_name = $item->get_name();
                         $product_id = $item->get_product_id();
@@ -1485,19 +1811,17 @@ function manage_kids_in_groups()
                             getCustomField($post_child_url, "kindergarden_type")
                         ]));
 
-
+                        $order_date = $order->get_date_created()->date('Y-m-d') ?? null;
+                        $order_status = $order->get_status();
                         $order_id = $order->get_id() ?? null;
                         $order_item_custom_fields = getCustomFieldsFromProductOrder($item);
 
+                        if ($order_id == 9489) {
+                            echo "<p>found</p>";
+                        }
                         foreach ($order_item_custom_fields as $order_item_custom_field => $key_item):
                             $groups = checkGroup($order_id, $child_id, $order_item_custom_field);
-
-                            if (in_array($order_item_custom_field, $excluded_keys, true)) {
-                                continue;
-                            }
-                            if (!in_array($order_item_custom_field, $include_only_keys, true)) {
-                                continue;
-                            }
+                            $order_item_custom_field_value = cleanMetaValue(getValueOfCustomFieldFromProductOrder($order_item_custom_field, $item));
 
                             if (is_numeric($child_age) && is_numeric($age_from_param) && ((int) $child_age < (int) $age_from_param)) {
                                 continue;
@@ -1518,7 +1842,13 @@ function manage_kids_in_groups()
                             if (!empty($product_param) && $product_param != $product_id) {
                                 continue;
                             }
-                            if (!empty($product_field_param) && $product_field_param != $order_item_custom_field) {
+                            $combined_value = "{$order_item_custom_field}: {$order_item_custom_field_value}";
+
+                            if (
+                                !empty($product_field_param) &&
+                                $product_field_param !== 'all' &&
+                                $product_field_param !== $combined_value
+                            ) {
                                 continue;
                             }
 
@@ -1541,6 +1871,22 @@ function manage_kids_in_groups()
                                     }
                                 }
                             }
+                            if (in_array($order_item_custom_field, $excluded_keys, true)) {
+                                continue;
+                            }
+                            /* Deactivated cause the list is not correct.
+                            if (!in_array($order_item_custom_field, $include_only_keys, true)) {
+                                continue;
+                            }
+                            */
+                            if ($exclude_orders_not_finalized && !in_array($order_status, $finalized_statuses = ['completed', 'processing'], true)) {
+                                continue;
+                            }
+
+                            if (!empty($include_only_order_status) && $order_status !== $include_only_order_status) {
+                                continue;
+                            }
+                            $count_items = $count_items + 1;
                             ?>
                             <tr order-data-tabel-id="<?php echo $order_id; ?>" order-data-product-name="<?php echo $product_name; ?>"
                                 <?php echo ($groups == "no-group") ? 'group="false"' : 'group="true"'; ?>>
@@ -1549,11 +1895,22 @@ function manage_kids_in_groups()
                                     $order_id = $order->get_id() ?? null;
                                     $order_url = get_permalink($order_id);
                                     $order_link = '<a class="link-dm" href="' . $order_url . '">#' . esc_html($order_id) . '</a>';
-                                    echo $order_id;
+                                    echo $order_link;
+
+                                    $order_status = $order->get_status();
+                                    $status_color = '#c19718';
+
+                                    if (in_array($order_status, ['completed', 'processing'])) {
+                                        $status_color = '#28a745';
+                                    } elseif (in_array($order_status, ['cancelled', 'failed'])) {
+                                        $status_color = '#dc3545';
+                                    }
                                     ?>
+                                    <span class="order-status" style="color: <?php echo esc_attr($status_color); ?>">
+                                        <?php echo esc_html($order_status); ?>
+                                    </span>
                                 </td>
                                 <td column="Order Details" class="row_order_details">
-                                    <?php $order_date = $order->get_date_created()->date('Y-m-d') ?? null; ?>
                                     <span><?php echo $order_date; ?></span>
                                     <?php
                                     $order_details = '<span>
@@ -1597,9 +1954,10 @@ function manage_kids_in_groups()
                                     ?>
                                 </td>
                                 <td column="Product Field" class="row_product_parameter">
-                                    <?php
-                                    echo $order_item_custom_field;
-                                    ?>
+                                    <?php echo '<div style="display: flex; gap: 4px;">';
+                                    echo '<span style="font-weight: 500;">' . $order_item_custom_field . '</span>';
+                                    echo '<span>' . $order_item_custom_field_value . '</span>';
+                                    echo '</div>'; ?>
                                 </td>
                                 <td column="Child's Name" class="row_kid_name">
                                     <?php
@@ -1637,6 +1995,12 @@ function manage_kids_in_groups()
                                         <?php echo $child_id ? $child_id : 'N/A'; ?>
                                     </p>
                                 </td>
+                                <td column="Child Age" class="row_kid_age">
+                                    <?php renderAgeFieldsOfPost($post_child_url); ?>
+                                </td>
+                                <td column="Child Gender" class="row_kid_gender">
+                                    <?php renderGenderFieldsOfPost($post_child_url); ?>
+                                </td>
                                 <td column="Child School" class="row_kid_school">
                                     <p>
                                         <?php echo $child_school ? $child_school : 'N/A'; ?>
@@ -1673,18 +2037,21 @@ function manage_kids_in_groups()
                                                         'order_date' => $order_date,
                                                         'order_details' => $order_details,
                                                         'product_details' => $product_details,
-                                                        'product_field' => $order_item_custom_field
+                                                        'product_field' => $order_item_custom_field,
+                                                        'product_field_value' => $order_item_custom_field_value
                                                     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-                                                    
+
                                                     <!-- JSON Data Storage -->
-                                                    <script type="application/json" id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>"><?php echo $dataJson; ?> </script>
+                                                    <script type="application/json"
+                                                        id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>"><?php echo $dataJson; ?> </script>
                                                 </div>
                                             </div>
                                         </div>
                                     </span>
                                 </td>
-                                <td column="Updates" class="row_update" >
-                                    <input type="checkbox" value="update" json-id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">                                                                                                                                                           
+                                <td column="Updates" class="row_update">
+                                    <input type="checkbox" value="update"
+                                        json-id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -1694,13 +2061,20 @@ function manage_kids_in_groups()
             </tbody>
         </table>
         <div class="dm-flex dm-bulk-section">
+
+            <label class="dm-label">
+                <span>סה"כ</span>
+                <div class="count-items"><?php echo $count_items; ?></div>
+            </label>
             <label class="dm-label">
                 <span>עדכון קבוצתי בכמות גדולה</span>
                 <select id="group-update-bulk" name="group-update-bulk" style="width:200px;">
                     <?php echo get_all_groups_options('no-group', array('nogroup' => true, 'allgroups' => false)); ?>
                 </select>
             </label>
-            <button class="btn-primary-dm btn-requests-dm" onclick="updateTable('products-from-orders table')">עדכון טבלה</button>
+            <button class="btn-primary-dm btn-requests-dm" onclick="updateTable('products-from-orders table')">עדכון
+                טבלה
+            </button>
         </div>
     </div>
     <?php
