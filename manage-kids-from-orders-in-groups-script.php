@@ -1554,11 +1554,16 @@ function manage_kids_in_groups()
 
     $age_from_param = isset($_GET['age_from']) ? $_GET['age_from'] : null;
     $age_to_param = isset($_GET['age_to']) ? $_GET['age_to'] : null;
+    $birth_date = isset($_GET['bith_date']) ? $_GET['bith_date'] : null;
     $kid_name_param = isset($_GET['kid_name']) ? $_GET['kid_name'] : null;
     $kid_id_param = isset($_GET['kid_id']) ? $_GET['kid_id'] : null;
     $group_param = isset($_GET['group_id']) ? $_GET['group_id'] : null;
     $product_param = isset($_GET['product_id']) ? $_GET['product_id'] : null;
     $product_field_param = isset($_GET['product_field']) ? $_GET['product_field'] : null;
+
+    $use_pagination = isset($_GET['use_pagination']) ? ($_GET['use_pagination'] == '1') : true;
+    $current_page = isset($_GET['pg']) ? max(1, intval($_GET['pg'])) : (isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1);
+    $items_per_page = 20;
 
     $exclude_product_fields = isset($_GET['exclude_product_fields']) ? array_map('trim', explode(',', $_GET['exclude_product_fields'])) : [];
     $excluded_keys = $exclude_product_fields;
@@ -1654,6 +1659,11 @@ function manage_kids_in_groups()
                 <input type="number" id="age-to-filter" name="age_to" placeholder="20" value="<?php echo $age_to_param; ?>">
             </label>
             <label class="dm-label">
+                <span>תאריך לידה</span>
+                <input type="text" id="birth_date" name="birth_date" placeholder="yyyy-mm-dd"
+                    value="<?php echo $birth_date; ?>">
+            </label>
+            <label class="dm-label">
                 <span>הרשמה לקבוצה</span>
                 <?php $product_fields = get_all_product_fields_with_values($excluded_keys, $include_only_keys); ?>
                 <select id="product-field-filter" name="product-field">
@@ -1708,6 +1718,13 @@ function manage_kids_in_groups()
                         <input type="checkbox" value="excule_orders_not_finalized" id="excule_orders_not_finalized" <?php if ($excule_orders_not_finalized)
                             echo "checked"; ?>>
                         <span> הצג הזמנות ששולמו בלבד</span>
+                    </div>
+                </label>
+                <label class="dm-label"> <span>הפעל חלוקה לעמודים</span>
+                    <div>
+                        <input type="checkbox" value="use_pagination" id="use_pagination" <?php if ($use_pagination)
+                            echo "checked"; ?>>
+                        <span>השתמש בדפדוף (20 לשורה)</span>
                     </div>
                 </label>
                 <?php
@@ -1809,6 +1826,7 @@ function manage_kids_in_groups()
                         $post_child_url = getChildPostId(cleanMetaValue($child_id));
                         $child_url = ($child_name && $child_id) ? showChildUrl($child_name, $child_id) : null;
                         $child_age = getCustomField($post_child_url, "age");
+                        $child_birth_date = getCustomField($post_child_url, "birth_date");
                         $child_school = implode(' ', array_filter([
                             getCustomField($post_child_url, "school_name"),
                             getCustomField($post_child_url, "class"),
@@ -1834,6 +1852,14 @@ function manage_kids_in_groups()
 
                             if (is_numeric($child_age) && is_numeric($age_to_param) && ((int) $child_age > (int) $age_to_param)) {
                                 continue;
+                            }
+                            if (!empty($child_birth_date) && !empty($birth_date)) {
+                                $child_birth_date_fmt = date('Y-m-d', strtotime($child_birth_date));
+                                $birth_date_fmt = date('Y-m-d', strtotime($birth_date));
+
+                                if ($child_birth_date_fmt === $birth_date_fmt) {
+                                    continue;
+                                }
                             }
 
                             if (!empty($kid_id_param) && $kid_id_param != $child_id) {
@@ -1892,46 +1918,48 @@ function manage_kids_in_groups()
                                 continue;
                             }
                             $count_items = $count_items + 1;
+                            $should_render = !$use_pagination || ($count_items > ($items_per_page * ($current_page - 1)) && $count_items <= ($items_per_page * $current_page));
                             ?>
-                            <tr order-data-tabel-id="<?php echo $order_id; ?>" order-data-product-name="<?php echo $product_name; ?>"
-                                <?php echo ($groups == "no-group") ? 'group="false"' : 'group="true"'; ?>>
-                                <td column="Order ID">
-                                    <?php
-                                    $order_id = $order->get_id() ?? null;
-                                    $order_url = get_permalink($order_id);
-                                    $order_link = '<a class="link-dm" href="' . $order_url . '">#' . esc_html($order_id) . '</a>';
-                                    echo $order_link;
+                            <?php if ($should_render): ?>
+                                <tr order-data-tabel-id="<?php echo $order_id; ?>" order-data-product-name="<?php echo $product_name; ?>"
+                                    <?php echo ($groups == "no-group") ? 'group="false"' : 'group="true"'; ?>>
+                                    <td column="Order ID">
+                                        <?php
+                                        $order_id = $order->get_id() ?? null;
+                                        $order_url = get_permalink($order_id);
+                                        $order_link = '<a class="link-dm" href="' . $order_url . '">#' . esc_html($order_id) . '</a>';
+                                        echo $order_link;
 
-                                    $order_status = $order->get_status();
-                                    $status_color = '#c19718';
+                                        $order_status = $order->get_status();
+                                        $status_color = '#c19718';
 
-                                    if (in_array($order_status, ['completed', 'processing'])) {
-                                        $status_color = '#28a745';
-                                    } elseif (in_array($order_status, ['cancelled', 'failed'])) {
-                                        $status_color = '#dc3545';
-                                    }
-                                    ?>
-                                    <span class="order-status" style="color: <?php echo esc_attr($status_color); ?>">
-                                        <?php echo esc_html($order_status); ?>
-                                    </span>
-                                </td>
-                                <td column="Order Details" class="row_order_details">
-                                    <span><?php echo $order_date; ?></span>
-                                    <?php
-                                    $order_details = '<span>
+                                        if (in_array($order_status, ['completed', 'processing'])) {
+                                            $status_color = '#28a745';
+                                        } elseif (in_array($order_status, ['cancelled', 'failed'])) {
+                                            $status_color = '#dc3545';
+                                        }
+                                        ?>
+                                        <span class="order-status" style="color: <?php echo esc_attr($status_color); ?>">
+                                            <?php echo esc_html($order_status); ?>
+                                        </span>
+                                    </td>
+                                    <td column="Order Details" class="row_order_details">
+                                        <span><?php echo $order_date; ?></span>
+                                        <?php
+                                        $order_details = '<span>
                                         <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
                                         <div class="show-more-details" style="display: none;">
                                             <div class="popup-style order-details-box">
                                                 <p><span class="field-label"> לקוח: </span>
                                                 <span class="field-value">';
-                                    $customer_id = $order->get_customer_id();
-                                    if ($customer_id) {
-                                        $user = get_user_by('id', $customer_id);
-                                        $order_details .= $user ? esc_html($user->display_name) : 'Guest';
-                                    } else {
-                                        $order_details .= 'Guest';
-                                    }
-                                    $order_details .= '</span></p>
+                                        $customer_id = $order->get_customer_id();
+                                        if ($customer_id) {
+                                            $user = get_user_by('id', $customer_id);
+                                            $order_details .= $user ? esc_html($user->display_name) : 'Guest';
+                                        } else {
+                                            $order_details .= 'Guest';
+                                        }
+                                        $order_details .= '</span></p>
 
                                     <p><span class="field-label">סטטוס:</span><span class="field-value">' . wc_get_order_status_name($order->get_status()) . '</span></p>
 
@@ -1944,139 +1972,191 @@ function manage_kids_in_groups()
                                         </div>
                                     </span>';
 
-                                    echo $order_details;
-                                    ?>
+                                        echo $order_details;
+                                        ?>
 
-                                </td>
-                                <td column="Product" class="row_product">
-                                    <?php
-                                    $product_details = '
+                                    </td>
+                                    <td column="Product" class="row_product">
+                                        <?php
+                                        $product_details = '
                                     <a href="' . esc_url(get_permalink($product_id)) . '" class="link-dm">
                                         ' . esc_html($product_name) . '
                                     </a>';
 
-                                    echo $product_details;
-                                    ?>
-                                </td>
-                                <td column="Product Field" class="row_product_parameter">
-                                    <?php echo '<div style="display: flex; gap: 4px;">';
-                                    echo '<span style="font-weight: 500;">' . $order_item_custom_field . '</span>';
-                                    echo '<span>' . $order_item_custom_field_value . '</span>';
-                                    echo '</div>'; ?>
-                                </td>
-                                <td column="Child's Name" class="row_kid_name">
-                                    <?php
-                                    echo "<span>" . $child_url ?? 'N/A' . "</span>";
-                                    $child_details = '
+                                        echo $product_details;
+                                        ?>
+                                    </td>
+                                    <td column="Product Field" class="row_product_parameter">
+                                        <?php echo '<div style="display: flex; gap: 4px;">';
+                                        echo '<span style="font-weight: 500;">' . $order_item_custom_field . '</span>';
+                                        echo '<span>' . $order_item_custom_field_value . '</span>';
+                                        echo '</div>'; ?>
+                                    </td>
+                                    <td column="Child's Name" class="row_kid_name">
+                                        <?php
+                                        echo "<span>" . $child_url ?? 'N/A' . "</span>";
+                                        $child_details = '
                                     <span>
                                         <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
 
                                         <div class="show-more-details" style="display: none;"><div class="popup-style child-details-box">
                                     ';
-                                    $child_details .= '<p><span class="field-label">ת.ז. הילד: </span><span class="field-value">' . ($post_child_url ? esc_html($post_child_url) : 'N/A') . '</span></p>';
+                                        $child_details .= '<p><span class="field-label">ת.ז. הילד: </span><span class="field-value">' . ($post_child_url ? esc_html($post_child_url) : 'N/A') . '</span></p>';
 
-                                    if ($post_child_url) {
-                                        $author_id = get_post_field('post_author', $post_child_url);
-                                        $author_name = $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
-                                        $child_details .= '<p><span class="field-label">לקוח: </span><span class="field-value">' . $author_name . '</span></p>';
-                                        ob_start();
-                                        customFieldsOfPost($post_child_url);
-                                        $child_details .= ob_get_clean();
-                                    }
-                                    $child_details .= '<p>
+                                        if ($post_child_url) {
+                                            $author_id = get_post_field('post_author', $post_child_url);
+                                            $author_name = $author_id ? esc_html(get_the_author_meta('display_name', $author_id)) : 'Unknown';
+                                            $child_details .= '<p><span class="field-label">לקוח: </span><span class="field-value">' . $author_name . '</span></p>';
+                                            ob_start();
+                                            customFieldsOfPost($post_child_url);
+                                            $child_details .= ob_get_clean();
+                                        }
+                                        $child_details .= '<p>
                                         <span class="field-label" style="display:none;">קישור ילד:  </span>
                                         <span class="field-value" style="display:none;">' . getChildUrl($child_id) . '</span>
                                         </p>';
-                                    $child_details .= '
+                                        $child_details .= '
                                             </div>
                                         </div>
                                     </span>
                                     ';
-                                    echo $child_details;
-                                    ?>
-                                </td>
-                                <td column="Child ID" class="row_kid_id">
-                                    <p>
-                                        <?php echo $child_id ? $child_id : 'N/A'; ?>
-                                    </p>
-                                </td>
-                                <td column="Child Age" class="row_kid_age">
-                                    <?php renderAgeFieldsOfPost($post_child_url); ?>
-                                </td>
-                                <td column="Child Gender" class="row_kid_gender">
-                                    <?php renderGenderFieldsOfPost($post_child_url); ?>
-                                </td>
-                                <td column="Child School" class="row_kid_school">
-                                    <p>
-                                        <?php echo $child_school ? $child_school : 'N/A'; ?>
-                                    </p>
-                                </td>
-                                <td column="Product Parameters" class="row_product_parameters">
-                                    <?php
-                                    if (!empty($order_item_custom_fields) && is_array($order_item_custom_fields)) {
-                                        foreach ($order_item_custom_fields as $field => $key_field) {
-                                            if (!in_array($field, $excluded_keys, true)) {
-                                                $field_value = cleanMetaValue(getValueOfCustomFieldFromProductOrder($field, $item));
-                                                echo "{$field} {$field_value} <br>";
+                                        echo $child_details;
+                                        ?>
+                                    </td>
+                                    <td column="Child ID" class="row_kid_id">
+                                        <p>
+                                            <?php echo $child_id ? $child_id : 'N/A'; ?>
+                                        </p>
+                                    </td>
+                                    <td column="Child Age" class="row_kid_age">
+                                        <?php renderAgeFieldsOfPost($post_child_url); ?>
+                                    </td>
+                                    <td column="Child Gender" class="row_kid_gender">
+                                        <?php renderGenderFieldsOfPost($post_child_url); ?>
+                                    </td>
+                                    <td column="Child School" class="row_kid_school">
+                                        <p>
+                                            <?php echo $child_school ? $child_school : 'N/A'; ?>
+                                        </p>
+                                    </td>
+                                    <td column="Product Parameters" class="row_product_parameters">
+                                        <?php
+                                        if (!empty($order_item_custom_fields) && is_array($order_item_custom_fields)) {
+                                            foreach ($order_item_custom_fields as $field => $key_field) {
+                                                if (!in_array($field, $excluded_keys, true)) {
+                                                    $field_value = cleanMetaValue(getValueOfCustomFieldFromProductOrder($field, $item));
+                                                    echo "{$field} {$field_value} <br>";
+                                                }
                                             }
                                         }
-                                    }
-                                    ?>
-                                </td>
-                                <td column="Group" class="row_groups group-td">
-                                    <span>
-                                        <?php echo groupsLinks($groups); ?>
-                                    </span>
+                                        ?>
+                                    </td>
+                                    <td column="Group" class="row_groups group-td">
+                                        <span>
+                                            <?php echo groupsLinks($groups); ?>
+                                        </span>
 
-                                    <span>
-                                        <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
-                                        <div class="show-more-details" style="display: none;">
-                                            <div class="popup-style group-box">
-                                                <div class="group-checkboxes">
-                                                    <div>
-                                                        <?php echo get_all_groups_checkboxes(); ?>
+                                        <span>
+                                            <button type="button" class="btn-dm show-more-btn" onclick="toggleDetails(this)">+</button>
+                                            <div class="show-more-details" style="display: none;">
+                                                <div class="popup-style group-box">
+                                                    <div class="group-checkboxes">
+                                                        <div>
+                                                            <?php echo get_all_groups_checkboxes(); ?>
+                                                        </div>
+                                                        <button type="button" class="btn-dm" name="manage-groups"
+                                                            onclick="updatePostGroups(this)" kid_id="<?php echo esc_attr($child_id); ?>"
+                                                            kid_name="<?php echo esc_attr($child_name); ?>"
+                                                            order_id="<?php echo esc_attr($order_id); ?>"
+                                                            order_date="<?php echo esc_attr($order_date); ?>"
+                                                            order_item_custom_field="<?php echo esc_attr($order_item_custom_field); ?>">
+                                                            להחיל
+                                                        </button>
+
+                                                        <?php $dataJson = json_encode([
+                                                            'kid_id' => $child_id,
+                                                            'kid_name' => $child_name,
+                                                            'kid_school' => $child_school,
+                                                            'kid_details' => $child_details,
+                                                            'order_id' => $order_id,
+                                                            'order_date' => $order_date,
+                                                            'order_details' => $order_details,
+                                                            'product_details' => $product_details,
+                                                            'product_field' => $order_item_custom_field,
+                                                            'product_field_value' => $order_item_custom_field_value
+                                                        ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+
+                                                        <!-- JSON Data Storage -->
+                                                        <script type="application/json"
+                                                            id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>"><?php echo $dataJson; ?> </script>
                                                     </div>
-                                                    <button type="button" class="btn-dm" name="manage-groups"
-                                                        onclick="updatePostGroups(this)" kid_id="<?php echo esc_attr($child_id); ?>"
-                                                        kid_name="<?php echo esc_attr($child_name); ?>"
-                                                        order_id="<?php echo esc_attr($order_id); ?>"
-                                                        order_date="<?php echo esc_attr($order_date); ?>"
-                                                        order_item_custom_field="<?php echo esc_attr($order_item_custom_field); ?>">
-                                                        להחיל
-                                                    </button>
-
-                                                    <?php $dataJson = json_encode([
-                                                        'kid_id' => $child_id,
-                                                        'kid_name' => $child_name,
-                                                        'kid_school' => $child_school,
-                                                        'kid_details' => $child_details,
-                                                        'order_id' => $order_id,
-                                                        'order_date' => $order_date,
-                                                        'order_details' => $order_details,
-                                                        'product_details' => $product_details,
-                                                        'product_field' => $order_item_custom_field,
-                                                        'product_field_value' => $order_item_custom_field_value
-                                                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
-
-                                                    <!-- JSON Data Storage -->
-                                                    <script type="application/json"
-                                                        id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>"><?php echo $dataJson; ?> </script>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </span>
-                                </td>
-                                <td column="Updates" class="row_update">
-                                    <input type="checkbox" value="update"
-                                        json-id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
-                                </td>
-                            </tr>
+                                        </span>
+                                    </td>
+                                    <td column="Updates" class="row_update">
+                                        <input type="checkbox" value="update"
+                                            json-id="kid-data-<?php echo esc_attr($child_id . '-' . $order_id . '-' . $order_item_custom_field); ?>">
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         <?php endforeach; ?>
 
                     <?php endforeach;
                 endforeach; ?>
             </tbody>
         </table>
+        <?php if ($use_pagination): ?>
+            <?php
+            $total_pages = (int) ceil(max(1, $count_items) / $items_per_page);
+            if ($total_pages < 1) {
+                $total_pages = 1;
+            }
+            $query_params = $_GET;
+            $query_params['use_pagination'] = '1';
+            $build_link = function ($page) use ($query_params) {
+                $query_params['pg'] = (int) $page;
+                unset($query_params['page']);
+                return add_query_arg($query_params);
+            };
+            $pages_to_show = [];
+            $pages_to_show[] = 1;
+            $pages_to_show[] = max(1, $current_page - 1);
+            $pages_to_show[] = $current_page;
+            $pages_to_show[] = min($total_pages, $current_page + 1);
+            $pages_to_show[] = $total_pages;
+            $pages_to_show = array_values(array_unique(array_filter($pages_to_show, function ($p) use ($total_pages) {
+                return $p >= 1 && $p <= $total_pages;
+            })));
+            sort($pages_to_show);
+            ?>
+            <div class="dm-flex" style="justify-content:center; margin: 12px 0; gap:8px;">
+                <?php if ($current_page > 1): ?>
+                    <a class="btn-dm" href="<?php echo esc_url($build_link($current_page - 1)); ?>">&lt;</a>
+                <?php else: ?>
+                    <span class="btn-dm" style="opacity:0.5; pointer-events:none;">&lt;</span>
+                <?php endif; ?>
+                <?php
+                $last = 0;
+                foreach ($pages_to_show as $p) {
+                    if ($last && $p > $last + 1) {
+                        echo '<span style="padding:4px 6px">...</span>';
+                    }
+                    if ($p == $current_page) {
+                        echo '<span class="btn-dm" style="background:#0073aa;color:#fff">' . (int) $p . '</span>';
+                    } else {
+                        echo '<a class="btn-dm" href="' . esc_url($build_link($p)) . '">' . (int) $p . '</a>';
+                    }
+                    $last = $p;
+                }
+                ?>
+                <?php if ($current_page < $total_pages): ?>
+                    <a class="btn-dm" href="<?php echo esc_url($build_link($current_page + 1)); ?>">&gt;</a>
+                <?php else: ?>
+                    <span class="btn-dm" style="opacity:0.5; pointer-events:none;">&gt;</span>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <div class="dm-flex dm-bulk-section">
 
             <label class="dm-label">
