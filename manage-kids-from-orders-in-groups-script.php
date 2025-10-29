@@ -1033,6 +1033,10 @@ function custom_code_css_js_manage_kids_in_groups()
             display: none;
         }
 
+        [column="Product Parameters"] {
+            font-size: 10px;
+        }
+
         [column_name="Updates"],
         [class="row_update"] {
             /*display: none;*/
@@ -1761,6 +1765,7 @@ function manage_kids_in_groups()
                     <th class="tab_kid_age" column_name="Kid Age"> גיל הילד </th>
                     <th class="tab_kid_gender" column_name="Kid Gender"> מין הילד </th>
                     <th class="tab_kid_school" column_name="Kid School">שם בית ספר, גן וכיתה</th>
+                    <th class="tab_product_parameters" column_name="Prod Params">פרמטרי מוצר</th>
                     <th class="tab_groups" column_name="Groups">קבוצה</th>
                     <th class="tab_updates" column_name="Updates">*</th>
                 </tr>
@@ -2005,6 +2010,18 @@ function manage_kids_in_groups()
                                     <p>
                                         <?php echo $child_school ? $child_school : 'N/A'; ?>
                                     </p>
+                                </td>
+                                <td column="Product Parameters" class="row_product_parameters">
+                                    <?php
+                                    if (!empty($order_item_custom_fields) && is_array($order_item_custom_fields)) {
+                                        foreach ($order_item_custom_fields as $field => $key_field) {
+                                            if (!in_array($field, $excluded_keys, true)) {
+                                                $field_value = cleanMetaValue(getValueOfCustomFieldFromProductOrder($field, $item));
+                                                echo "{$field} {$field_value} <br>";
+                                            }
+                                        }
+                                    }
+                                    ?>
                                 </td>
                                 <td column="Group" class="row_groups group-td">
                                     <span>
